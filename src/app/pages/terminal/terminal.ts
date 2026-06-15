@@ -1,0 +1,425 @@
+import {
+  AfterViewInit,
+  ChangeDetectorRef,
+  Component,
+  ElementRef,
+  OnDestroy,
+  ViewChild,
+} from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
+import { Title } from '@angular/platform-browser';
+import { HttpClient } from '@angular/common/http';
+import { NzButtonModule } from 'ng-zorro-antd/button';
+import { NzDrawerModule } from 'ng-zorro-antd/drawer';
+import { NzIconModule } from 'ng-zorro-antd/icon';
+import { NzInputNumberModule } from 'ng-zorro-antd/input-number';
+import { NzModalModule } from 'ng-zorro-antd/modal';
+import { NzSelectModule } from 'ng-zorro-antd/select';
+import { NzSwitchModule } from 'ng-zorro-antd/switch';
+import { NzTooltipModule } from 'ng-zorro-antd/tooltip';
+import { ITheme, Terminal } from '@xterm/xterm';
+import { FitAddon } from '@xterm/addon-fit';
+import { controlPlanePath } from '../../core/api.constants';
+
+/** Packet type bytes for outgoing messages (server defines inbound types). */
+const enum PktType {
+  Data = 0x01,
+  Resize = 0x02,
+}
+
+interface TerminalSettings {
+  theme: string;
+  fontFamily: string;
+  fontSize: number;
+  cursorStyle: 'block' | 'underline' | 'bar';
+  cursorBlink: boolean;
+  scrollback: number;
+  visualBell: boolean;
+  copyOnSelect: boolean;
+  rightClickPaste: boolean;
+}
+
+interface EventLogEntry {
+  when: string;
+  message: string;
+}
+
+const SETTINGS_STORAGE_KEY = 'ddm-terminal-settings';
+
+const DEFAULT_SETTINGS: TerminalSettings = {
+  theme: 'Dark Slate',
+  fontFamily: 'Consolas, "Courier New", monospace',
+  fontSize: 14,
+  cursorStyle: 'block',
+  cursorBlink: true,
+  scrollback: 2000,
+  visualBell: true,
+  copyOnSelect: false,
+  rightClickPaste: true,
+};
+
+const THEMES: Record<string, ITheme> = {
+  'Dark Slate': {
+    background: '#373e4d',
+    foreground: '#e8eaf0',
+    cursor: '#ffffff',
+    selectionBackground: 'rgba(255, 255, 255, 0.3)',
+  },
+  'PuTTY Classic': {
+    background: '#000000',
+    foreground: '#bbbbbb',
+    cursor: '#00ff00',
+    selectionBackground: 'rgba(255, 255, 255, 0.3)',
+  },
+  'Light': {
+    background: '#ffffff',
+    foreground: '#1f1f1f',
+    cursor: '#1f1f1f',
+    selectionBackground: 'rgba(0, 0, 0, 0.2)',
+  },
+  'Green Phosphor': {
+    background: '#001100',
+    foreground: '#00cc66',
+    cursor: '#00ff88',
+    selectionBackground: 'rgba(0, 255, 136, 0.3)',
+  },
+  'Solarized Dark': {
+    background: '#002b36',
+    foreground: '#839496',
+    cursor: '#93a1a1',
+    selectionBackground: 'rgba(147, 161, 161, 0.3)',
+  },
+};
+
+@Component({
+  selector: 'app-terminal',
+  standalone: true,
+  imports: [
+    CommonModule,
+    FormsModule,
+    NzButtonModule,
+    NzDrawerModule,
+    NzIconModule,
+    NzInputNumberModule,
+    NzModalModule,
+    NzSelectModule,
+    NzSwitchModule,
+    NzTooltipModule,
+  ],
+  templateUrl: './terminal.html',
+  styleUrls: ['./terminal.css'],
+})
+export class TerminalPage implements AfterViewInit, OnDestroy {
+  @ViewChild('terminalHost') terminalHost!: ElementRef<HTMLDivElement>;
+
+  osUser = 'kei';
+  hostname = 'rhel_app2';
+  ip = '10.12.12.12';
+  crNumber = 'CR2025012412';
+  hostId = '';
+  crId = '';
+
+  connected = false;
+  connecting = false;
+  connectionError = '';
+  bellFlash = false;
+  isSettingsOpen = false;
+  isEventLogOpen = false;
+
+  settings: TerminalSettings = { ...DEFAULT_SETTINGS };
+  themeOptions = Object.keys(THEMES);
+  fontOptions = [
+    'Consolas, "Courier New", monospace',
+    '"Courier New", monospace',
+    '"Cascadia Mono", Consolas, monospace',
+    '"Lucida Console", monospace',
+    'monospace',
+  ];
+  eventLog: EventLogEntry[] = [];
+
+  private term!: Terminal;
+  private fitAddon = new FitAddon();
+  private ws: WebSocket | null = null;
+  private encoder = new TextEncoder();
+  private sessionLog: string[] = [];
+  private resizeHandler = () => {
+    this.fitAddon.fit();
+    this.sendResize();
+  };
+
+  constructor(
+    private route: ActivatedRoute,
+    private titleService: Title,
+    private cd: ChangeDetectorRef,
+    private http: HttpClient,
+  ) {}
+
+  ngAfterViewInit(): void {
+    const params = this.route.snapshot.queryParamMap;
+    this.osUser = params.get('user') || this.osUser;
+    this.hostname = params.get('host') || this.hostname;
+    this.ip = params.get('ip') || this.ip;
+    this.crNumber = params.get('cr') || this.crNumber;
+    this.hostId = params.get('hostId') || 'host-dev-1';
+    this.crId = params.get('crId') || 'cr-test-1';
+    this.titleService.setTitle(`${this.osUser}@${this.ip} - DenDenMushi SSH`);
+
+    this.loadSettings();
+
+    this.term = new Terminal({
+      fontFamily: this.settings.fontFamily,
+      fontSize: this.settings.fontSize,
+      cursorStyle: this.settings.cursorStyle,
+      cursorBlink: this.settings.cursorBlink,
+      scrollback: this.settings.scrollback,
+      theme: THEMES[this.settings.theme],
+    });
+    this.term.loadAddon(this.fitAddon);
+    this.term.open(this.terminalHost.nativeElement);
+    this.fitAddon.fit();
+    window.addEventListener('resize', this.resizeHandler);
+
+    this.term.onData((data) => this.sendInput(data));
+    this.term.onBell(() => this.ringBell());
+    this.term.onSelectionChange(() => {
+      if (this.settings.copyOnSelect && this.term.hasSelection()) {
+        navigator.clipboard.writeText(this.term.getSelection()).catch(() => {});
+      }
+    });
+
+    this.connect();
+    this.term.focus();
+    this.cd.detectChanges();
+  }
+
+  ngOnDestroy(): void {
+    window.removeEventListener('resize', this.resizeHandler);
+    this.ws?.close();
+    this.term?.dispose();
+  }
+
+  // --- Connection lifecycle ---
+
+  private connect(): void {
+    this.connecting = true;
+    this.connectionError = '';
+    this.writeLine(`Connecting to ${this.hostname} (${this.ip})...`);
+    this.logEvent(`Session requested as ${this.osUser}@${this.ip} (${this.crNumber})`);
+
+    this.http
+      .post<{ websocketUrl: string; sessionToken: string }>(
+        controlPlanePath('sessions/start'),
+        { hostId: this.hostId, crId: this.crId, connectionType: 'ssh' },
+      )
+      .subscribe({
+        next: (session) => this.openWebSocket(session.websocketUrl, session.sessionToken),
+        error: (err) => {
+          const msg: string =
+            err?.error?.message ?? err?.message ?? 'Session start failed';
+          this.connectionError = msg;
+          this.connecting = false;
+          this.writeLine(`\x1b[31mError: ${msg}\x1b[0m`);
+          this.logEvent(`Connection failed: ${msg}`);
+          this.cd.detectChanges();
+        },
+      });
+  }
+
+  private openWebSocket(url: string, token: string): void {
+    const wsUrl = `${url}?token=${encodeURIComponent(token)}`;
+    const ws = new WebSocket(wsUrl);
+    ws.binaryType = 'arraybuffer';
+    this.ws = ws;
+
+    ws.onopen = () => {
+      this.connected = true;
+      this.connecting = false;
+      this.connectionError = '';
+      this.logEvent(`WebSocket open: ${this.osUser}@${this.ip} (${this.crNumber})`);
+      this.sendResize();
+      this.cd.detectChanges();
+    };
+
+    ws.onmessage = (event: MessageEvent) => {
+      const packet = new Uint8Array(event.data as ArrayBuffer);
+      if (packet.length < 2) return;
+
+      // First byte is a type discriminator; all remaining bytes are the payload.
+      // We write every payload to the terminal — the server controls what it sends.
+      const payload = packet.slice(1);
+      this.term.write(new TextDecoder().decode(payload));
+    };
+
+    ws.onerror = () => {
+      this.connectionError = 'WebSocket error';
+      this.logEvent('WebSocket error');
+      this.cd.detectChanges();
+    };
+
+    ws.onclose = (event: CloseEvent) => {
+      this.connected = false;
+      this.connecting = false;
+      this.ws = null;
+      const reason = event.reason ? ` (${event.reason})` : '';
+      this.writeLine(`\r\n\x1b[33mConnection closed${reason}.\x1b[0m`);
+      this.logEvent(`WebSocket closed: code=${event.code}${reason}`);
+      this.cd.detectChanges();
+    };
+  }
+
+  reconnect(): void {
+    this.ws?.close();
+    this.ws = null;
+    this.term.reset();
+    this.logEvent('Reconnect requested');
+    this.connect();
+    this.term.focus();
+  }
+
+  private writeLine(text: string): void {
+    this.term.writeln(text);
+    this.sessionLog.push(text);
+  }
+
+  /** Send raw terminal input to the WebSocket as a binary packet. */
+  private sendInput(data: string): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+
+    const dataBytes = this.encoder.encode(data);
+    const packet = new Uint8Array(1 + dataBytes.length);
+    packet[0] = PktType.Data;
+    packet.set(dataBytes, 1);
+    this.ws.send(packet.buffer);
+  }
+
+  /** Inform the server of the current terminal dimensions. */
+  private sendResize(): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+
+    const cols = this.term.cols;
+    const rows = this.term.rows;
+    const payload = this.encoder.encode(JSON.stringify({ cols, rows }));
+    const packet = new Uint8Array(1 + payload.length);
+    packet[0] = PktType.Resize;
+    packet.set(payload, 1);
+    this.ws.send(packet.buffer);
+  }
+
+  private ringBell(): void {
+    if (!this.settings.visualBell) {
+      return;
+    }
+    this.bellFlash = true;
+    this.cd.detectChanges();
+    setTimeout(() => {
+      this.bellFlash = false;
+      this.cd.detectChanges();
+    }, 150);
+  }
+
+  // --- PuTTY-style window actions ---
+
+  copyAll(): void {
+    this.term.selectAll();
+    const content = this.term.getSelection();
+    this.term.clearSelection();
+    navigator.clipboard.writeText(content).catch(() => {});
+    this.logEvent('Copied all terminal output to clipboard');
+  }
+
+  pasteFromClipboard(): void {
+    navigator.clipboard.readText().then((text) => {
+      if (text) {
+        this.pasteText(text);
+      }
+    }).catch(() => {});
+  }
+
+  onContextMenu(event: MouseEvent): boolean {
+    if (this.settings.rightClickPaste) {
+      event.preventDefault();
+      this.pasteFromClipboard();
+      return false;
+    }
+    return true;
+  }
+
+  private pasteText(text: string): void {
+    this.sendInput(text);
+  }
+
+  clearScrollback(): void {
+    this.term.clear();
+    this.logEvent('Scrollback cleared');
+  }
+
+  resetTerminal(): void {
+    this.term.reset();
+    this.logEvent('Terminal reset');
+    this.term.focus();
+  }
+
+  downloadLog(): void {
+    const header = [
+      `DenDenMushi Web SSH session log`,
+      `Session: ${this.osUser}@${this.hostname} (${this.ip})`,
+      `Change request: ${this.crNumber}`,
+      `Saved: ${new Date().toLocaleString()}`,
+      ''.padEnd(60, '='),
+    ];
+    const blob = new Blob([[...header, ...this.sessionLog].join('\r\n')], {
+      type: 'text/plain',
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${this.hostname}-${this.osUser}-${Date.now()}.log`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    this.logEvent('Session log downloaded');
+  }
+
+  toggleFullscreen(): void {
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      document.documentElement.requestFullscreen();
+    }
+  }
+
+  // --- Settings ---
+
+  applySettings(): void {
+    this.term.options.fontFamily = this.settings.fontFamily;
+    this.term.options.fontSize = this.settings.fontSize;
+    this.term.options.cursorStyle = this.settings.cursorStyle;
+    this.term.options.cursorBlink = this.settings.cursorBlink;
+    this.term.options.scrollback = this.settings.scrollback;
+    this.term.options.theme = THEMES[this.settings.theme];
+    this.fitAddon.fit();
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(this.settings));
+    this.logEvent('Settings changed');
+  }
+
+  restoreDefaultSettings(): void {
+    this.settings = { ...DEFAULT_SETTINGS };
+    this.applySettings();
+  }
+
+  private loadSettings(): void {
+    try {
+      const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
+      if (saved) {
+        this.settings = { ...DEFAULT_SETTINGS, ...JSON.parse(saved) };
+      }
+    } catch {
+      this.settings = { ...DEFAULT_SETTINGS };
+    }
+  }
+
+  private logEvent(message: string): void {
+    this.eventLog.push({ when: new Date().toLocaleTimeString(), message });
+  }
+}

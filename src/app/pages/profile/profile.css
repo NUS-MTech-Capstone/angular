@@ -1,0 +1,44 @@
+.profile-page {
+  display: flex;
+  justify-content: center;
+}
+
+.profile-card {
+  width: 640px;
+  max-width: 100%;
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.profile-header h2 {
+  margin: 0;
+}
+
+.profile-username {
+  margin: 0;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.profile-avatar {
+  background: #6f42c1;
+  color: #fff;
+}
+
+.logout-btn {
+  margin-left: auto;
+}
+
+.permission-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.permission-list nz-tag {
+  margin: 0;
+}

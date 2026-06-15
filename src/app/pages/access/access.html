@@ -1,0 +1,289 @@
+<div class="access-page">
+  <aside class="access-sider" [class.collapsed]="isPanelCollapsed">
+    <div class="access-sider-header">
+      <span class="title" *ngIf="!isPanelCollapsed">Access</span>
+      <span
+        nz-icon
+        nzType="left"
+        class="collapse-icon"
+        [class.flipped]="isPanelCollapsed"
+        (click)="isPanelCollapsed = !isPanelCollapsed"></span>
+    </div>
+    <ul class="access-menu" *ngIf="!isPanelCollapsed">
+      <li
+        *ngFor="let section of sections"
+        [class.selected]="section === activeSection"
+        (click)="selectSection(section)">
+        {{ section }}
+      </li>
+    </ul>
+  </aside>
+
+  <section class="access-content">
+    <ng-container *ngIf="activeSection === 'Change Requests'">
+      <nz-input-group [nzPrefix]="crSearchIcon" class="search-bar" nzSize="large">
+        <input
+          nz-input
+          placeholder="Search change request by ID or title"
+          [(ngModel)]="crSearchTerm"
+          [nzAutocomplete]="crAuto" />
+      </nz-input-group>
+      <ng-template #crSearchIcon><span nz-icon nzType="search"></span></ng-template>
+      <nz-autocomplete #crAuto (selectionChange)="onCrSelected($event.nzValue)">
+        <nz-auto-option
+          *ngFor="let request of matchingRequests"
+          [nzValue]="request.id"
+          [nzLabel]="crNumber(request)">
+          <span class="cr-option-number">{{ crNumber(request) }}</span>
+          <span class="cr-option-title">{{ request.title }}</span>
+        </nz-auto-option>
+      </nz-autocomplete>
+    </ng-container>
+
+    <ng-container *ngIf="activeSection === 'Servers'">
+      <nz-input-group [nzPrefix]="serverSearchIcon" class="search-bar" nzSize="large">
+        <input
+          nz-input
+          placeholder="Search servers by hostname, IP or implementer group"
+          [(ngModel)]="serverSearchTerm" />
+      </nz-input-group>
+      <ng-template #serverSearchIcon><span nz-icon nzType="search"></span></ng-template>
+    </ng-container>
+
+    <ng-container *ngIf="activeSection === 'Servers'">
+      <div class="servers-header" *ngIf="userImplementerGroups.length">
+        <span class="meta-label">Your implementer groups</span>
+        <div class="tag-list">
+          <nz-tag *ngFor="let group of userImplementerGroups" nzColor="blue">{{ group.name }}</nz-tag>
+        </div>
+      </div>
+
+      <nz-empty
+        *ngIf="!isLoadingServers && groupServers.length === 0"
+        nzNotFoundContent="No servers are assigned to your implementer groups yet."
+        class="cr-empty"></nz-empty>
+
+      <ng-container *ngIf="groupServers.length">
+        <ng-container
+          *ngTemplateOutlet="serversTable; context: { servers: activeServers, loading: isLoadingServers, showGroups: true }">
+        </ng-container>
+      </ng-container>
+    </ng-container>
+
+    <ng-container *ngIf="activeSection === 'Change Requests'">
+      <nz-empty
+        *ngIf="!isLoading && accessibleRequests.length === 0"
+        nzNotFoundContent="No approved change requests are available for your user groups."
+        class="cr-empty"></nz-empty>
+
+      <ng-container *ngIf="selectedRequest as cr">
+        <div class="cr-header">
+          <h2 class="cr-number">{{ crNumber(cr) }}</h2>
+          <div class="cr-meta">
+            <div class="meta-item">
+              <span class="meta-label">CR Summary</span>
+              <span class="meta-value">{{ cr.title }}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Description</span>
+              <span class="meta-value">{{ cr.description }}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Requester</span>
+              <span class="meta-value">{{ cr.requester }}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Approver</span>
+              <span class="meta-value">{{ cr.approver || '-' }}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Created</span>
+              <span class="meta-value">{{ cr.createdAt | date: 'dd MMM yy HH:mm' }}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Implementer Groups</span>
+              <span class="meta-value">
+                <ng-container *ngIf="cr.implementerGroups.length; else noImplementers">
+                  <nz-tag *ngFor="let group of cr.implementerGroups" nzColor="blue">{{ group.name }}</nz-tag>
+                </ng-container>
+                <ng-template #noImplementers>-</ng-template>
+              </span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Access Roles</span>
+              <span class="meta-value">
+                <ng-container *ngIf="cr.allowedRoles.length; else everyone">
+                  <nz-tag *ngFor="let role of cr.allowedRoles" nzColor="purple">{{ role }}</nz-tag>
+                </ng-container>
+                <ng-template #everyone>All roles</ng-template>
+              </span>
+            </div>
+          </div>
+          <div class="cr-activities" *ngIf="cr.osUsers.length">
+            <span class="meta-label">OS Users (from implementer groups)</span>
+            <div class="tag-list">
+              <nz-tag *ngFor="let osUser of cr.osUsers">{{ osUser }}</nz-tag>
+            </div>
+          </div>
+          <div class="cr-activities" *ngIf="cr.activities.length">
+            <span class="meta-label">Activities</span>
+            <ul>
+              <li *ngFor="let activity of cr.activities">{{ activity }}</li>
+            </ul>
+          </div>
+        </div>
+
+        <ng-container
+          *ngTemplateOutlet="serversTable; context: { servers: activeServers, loading: isLoading, showGroups: false }">
+        </ng-container>
+      </ng-container>
+    </ng-container>
+
+    <ng-container *ngIf="activeSection === 'Sessions' || activeSection === 'Proxies'">
+      <div class="section-placeholder">{{ activeSection }} — coming soon.</div>
+    </ng-container>
+  </section>
+</div>
+
+<ng-template #serversTable let-servers="servers" let-loading="loading" let-showGroups="showGroups">
+  <nz-table
+    #serversTableRef
+    [nzData]="servers"
+    [nzLoading]="loading"
+    [nzShowPagination]="false"
+    nzBordered
+    class="servers-table">
+    <thead>
+      <tr>
+        <th [nzSortFn]="sortHostname">Hostname</th>
+        <th [nzSortFn]="sortIp">IP Address</th>
+        <th [nzSortFn]="sortStatus">Status</th>
+        <th [nzSortFn]="sortOs">OS Version</th>
+        <th>SSH Port</th>
+        <th *ngIf="showGroups">Implementer Groups</th>
+        <th [nzSortFn]="sortSessions">Active Sessions</th>
+        <th nzWidth="48px"></th>
+      </tr>
+    </thead>
+    <tbody>
+      <ng-container *ngFor="let server of serversTableRef.data">
+        <tr>
+          <td>{{ server.hostname }}</td>
+          <td>{{ server.ipAddress }}</td>
+          <td><nz-tag [nzColor]="getStatusColor(server.assetStatus)">{{ server.assetStatus }}</nz-tag></td>
+          <td>{{ server.osVersion }}</td>
+          <td>{{ server.sshPort }}</td>
+          <td *ngIf="showGroups">
+            <ng-container *ngIf="server.implementerGroups.length; else noGroup">
+              <nz-tag *ngFor="let group of server.implementerGroups">{{ group }}</nz-tag>
+            </ng-container>
+            <ng-template #noGroup>-</ng-template>
+          </td>
+          <td>{{ server.sessions.length }}</td>
+          <td [(nzExpand)]="server.expanded"></td>
+        </tr>
+        <tr [nzExpand]="server.expanded">
+          <td [attr.colspan]="showGroups ? 8 : 7">
+            <div class="session-panel">
+              <div class="os-user-row">
+                <div class="os-user-field">
+                  <span class="meta-label">OS User</span>
+                  <nz-select [(ngModel)]="server.selectedOsUser" class="os-user-select">
+                    <nz-option
+                      *ngFor="let user of server.osUsers"
+                      [nzValue]="user"
+                      [nzLabel]="user" />
+                  </nz-select>
+                </div>
+                <button
+                  nz-button
+                  class="btn-launch"
+                  [disabled]="!can('access.launch') || !server.osUsers.length || !server.selectedOsUser"
+                  (click)="launchNew(server)">
+                  Launch SSH
+                </button>
+              </div>
+
+              <h4 class="sessions-title">Active Sessions : {{ server.sessions.length }}</h4>
+
+              <nz-table
+                #sessionsTable
+                [nzData]="server.sessions"
+                [nzShowPagination]="false"
+                nzSize="small"
+                nzBordered
+                class="sessions-table">
+                <thead>
+                  <tr>
+                    <th>CR Number</th>
+                    <th>Created By</th>
+                    <th>Last Activity</th>
+                    <th>OS User</th>
+                    <th>Current Implementor</th>
+                    <th>Action</th>
+                    <th>Observers</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let session of sessionsTable.data">
+                    <td>{{ session.crNumber }}</td>
+                    <td>{{ session.createdBy }}</td>
+                    <td>{{ session.lastActivity }}</td>
+                    <td>{{ session.osUser }}</td>
+                    <td>{{ session.currentImplementor }}</td>
+                    <td>
+                      <nz-space>
+                        <button
+                          *nzSpaceItem
+                          nz-button
+                          nzSize="small"
+                          class="btn-join"
+                          [disabled]="!session.primaryEnabled || !can('access.launch')"
+                          (click)="session.primaryAction === 'Join' ? joinSession(server, session) : requestSession(session)">
+                          {{ session.primaryAction }}
+                        </button>
+                        <button
+                          *nzSpaceItem
+                          nz-button
+                          nzType="primary"
+                          nzDanger
+                          nzSize="small"
+                          [disabled]="!session.canStop || !can('access.stop')"
+                          (click)="stopSession(server, session)">
+                          Stop
+                        </button>
+                      </nz-space>
+                    </td>
+                    <td>
+                      <nz-select
+                        [(ngModel)]="session.observer"
+                        nzAllowClear
+                        nzPlaceHolder="-"
+                        class="observer-select"
+                        nzSize="small">
+                        <nz-option
+                          *ngFor="let observer of observerOptions"
+                          [nzValue]="observer"
+                          [nzLabel]="observer" />
+                      </nz-select>
+                    </td>
+                    <td>
+                      <button
+                        nz-button
+                        nzSize="small"
+                        class="btn-watch"
+                        [disabled]="!session.canWatch || !can('access.watch')">
+                        Watch
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </nz-table>
+            </div>
+          </td>
+        </tr>
+      </ng-container>
+    </tbody>
+  </nz-table>
+</ng-template>

@@ -1,0 +1,42 @@
+<div class="login-page">
+  <nz-card class="login-card">
+    <div class="login-brand">
+      <h1>DenDenMushi</h1>
+      <p>Privileged access management platform</p>
+    </div>
+
+    <nz-alert *ngIf="error" nzType="error" [nzMessage]="error" nzShowIcon class="login-error"></nz-alert>
+
+    <ng-container *ngIf="mode === 'alb'; else devLogin">
+      <button
+        nz-button
+        nzType="primary"
+        nzBlock
+        nzSize="large"
+        [nzLoading]="isSsoLoading"
+        (click)="loginWithSso()">
+        <span nz-icon nzType="safety"></span>
+        Login via SSO
+      </button>
+      <p class="sso-hint">You will be redirected to the corporate identity provider.</p>
+    </ng-container>
+
+    <ng-template #devLogin>
+      <p class="dev-hint">Development mode — sign in as a mock user:</p>
+      <div class="dev-user-list">
+        <button
+          *ngFor="let user of devUsers"
+          nz-button
+          nzBlock
+          class="dev-user-btn"
+          [nzLoading]="loadingUser === user.username"
+          (click)="signInAs(user.username)">
+          <span class="dev-user-name">{{ user.name }}</span>
+          <span class="dev-user-roles">
+            <nz-tag *ngFor="let role of user.roles">{{ role }}</nz-tag>
+          </span>
+        </button>
+      </div>
+    </ng-template>
+  </nz-card>
+</div>

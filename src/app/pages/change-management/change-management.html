@@ -1,0 +1,228 @@
+  <div class="header-actions" style="justify-content: space-between; text-align: right; margin-bottom: 16px;">
+    <button nz-button nzType="primary" *ngIf="can('change.create')" (click)="openCreateModal()">
+      <i nz-icon nzType="plus"></i>
+      New change request
+    </button>
+  </div>
+
+  <nz-tabs [nzSelectedIndex]="['All', 'Pending', 'Approved', 'Rejected'].indexOf(activeTab)" (nzSelectedIndexChange)="selectTab(['All', 'Pending', 'Approved', 'Rejected'][$event])">
+    <nz-tab nzTitle="All"></nz-tab>
+    <nz-tab nzTitle="Pending"></nz-tab>
+    <nz-tab nzTitle="Approved"></nz-tab>
+    <nz-tab nzTitle="Rejected"></nz-tab>
+  </nz-tabs>
+
+  <div class="page-grid">
+    <div class="table-panel">
+      <nz-card nzTitle="Change requests ({{ filteredRequests.length }})">
+        <nz-table #changeRequestTable [nzData]="filteredRequests" [nzLoading]="isLoading" nzBordered>
+          <thead>
+            <tr>
+              <th>CR ID</th>
+              <th>Title</th>
+              <th>Requester</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let request of changeRequestTable.data">
+              <td><span class="cr-id" nz-tooltip [nzTooltipTitle]="request.id">{{ crNumber(request) }}</span></td>
+              <td>{{ request.title }}</td>
+              <td>{{ request.requester }}</td>
+              <td>
+                <nz-tag [nzColor]="getStatusColor(request.status)">{{ request.status }}</nz-tag>
+              </td>
+              <td>{{ request.createdAt | date: 'short' }}</td>
+              <td>
+                <nz-space nzWrap>
+                  <button nz-button nzType="default" nzSize="small" (click)="viewRequest(request)">View</button>
+                  <button nz-button nzType="default" nzSize="small" [disabled]="request.status !== 'Pending' || !can('change.update')" (click)="editRequest(request)">Edit</button>
+                  <button nz-button nzType="primary" nzSize="small" [disabled]="request.status !== 'Pending' || !can('change.approve')" (click)="approveRequest(request)">
+                    Approve
+                  </button>
+                  <button nz-button nzType="default" nzDanger nzSize="small" [disabled]="request.status !== 'Pending' || !can('change.approve')" (click)="rejectRequest(request)">
+                    Reject
+                  </button>
+                </nz-space>
+              </td>
+            </tr>
+          </tbody>
+        </nz-table>
+      </nz-card>
+    </div>
+  </div>
+
+<!-- Form Modal -->
+<nz-modal 
+  [(nzVisible)]="isModalOpen"
+  [nzTitle]="editingRequestId ? 'Edit change request' : 'Create change request'"
+  nzCentered
+  nzWidth="600px"
+  [nzOkText]="editingRequestId ? 'Save changes' : 'Create request'"
+  [nzCancelText]="'Cancel'"
+  [nzOkLoading]="isSubmitting"
+  [nzCancelDisabled]="isSubmitting"
+  [nzMaskClosable]="!isSubmitting"
+  [nzKeyboard]="!isSubmitting"
+  (nzOnOk)="submitForm()"
+  (nzOnCancel)="resetForm()">
+  <nz-spin [nzSimple]="true" [nzSpinning]="isSubmitting">
+    <ng-container *nzModalContent>
+      <form nz-form [formGroup]="changeForm" (ngSubmit)="submitForm()">
+        <nz-form-item>
+          <nz-form-label [nzSpan]="24" nzRequired>Title</nz-form-label>
+          <nz-form-control [nzSpan]="24" nzErrorTip="Please enter a title">
+            <input nz-input formControlName="title" placeholder="Enter change title"  />
+          </nz-form-control>
+        </nz-form-item>
+
+        <nz-form-item>
+          <nz-form-label [nzSpan]="24" nzRequired>Description</nz-form-label>
+          <nz-form-control [nzSpan]="24" nzErrorTip="Please add a description">
+            <textarea nz-input rows="4" formControlName="description" placeholder="Describe the change" ></textarea>
+          </nz-form-control>
+        </nz-form-item>
+
+        <nz-form-item>
+          <nz-form-label [nzSpan]="24" nzRequired>Approval route</nz-form-label>
+          <nz-form-control [nzSpan]="24">
+            <nz-select formControlName="approvalRoute" [nzDisabled]="isSubmitting">
+              <nz-option nzValue="Normal" nzLabel="Normal review" />
+              <nz-option nzValue="Fast track" nzLabel="Fast track" />
+              <nz-option nzValue="Security review" nzLabel="Security review" />
+            </nz-select>
+          </nz-form-control>
+        </nz-form-item>
+
+        <nz-form-item>
+          <nz-form-label [nzSpan]="24">Activities</nz-form-label>
+          <nz-form-control [nzSpan]="24" nzExtra="What will be performed on the VMs. Type an activity and press Enter.">
+            <nz-select
+              formControlName="activities"
+              nzMode="tags"
+              nzPlaceHolder="e.g. Patch OS, Restart nginx, Rotate certificates"
+              [nzDisabled]="isSubmitting">
+            </nz-select>
+          </nz-form-control>
+        </nz-form-item>
+
+        <nz-form-item>
+          <nz-form-label [nzSpan]="24">Virtual machines</nz-form-label>
+          <nz-form-control [nzSpan]="24" nzExtra="VMs from the inventory that this change applies to.">
+            <nz-select
+              formControlName="vmIds"
+              nzMode="multiple"
+              nzPlaceHolder="Select VMs from inventory"
+              [nzDisabled]="isSubmitting">
+              <nz-option *ngFor="let vm of vms" [nzValue]="vm.id" [nzLabel]="vmLabel(vm)" />
+            </nz-select>
+          </nz-form-control>
+        </nz-form-item>
+
+        <nz-form-item>
+          <nz-form-label [nzSpan]="24">Implementer groups</nz-form-label>
+          <nz-form-control [nzSpan]="24" nzExtra="Assign this ticket to implementer groups. Their OS users will be used for SSH sessions in Access.">
+            <nz-select
+              formControlName="implementerGroupIds"
+              nzMode="multiple"
+              nzPlaceHolder="Select implementer groups"
+              [nzDisabled]="isSubmitting">
+              <nz-option
+                *ngFor="let group of implementerGroups"
+                [nzValue]="group.id"
+                [nzLabel]="implementerGroupLabel(group)" />
+            </nz-select>
+          </nz-form-control>
+        </nz-form-item>
+
+        <nz-form-item>
+          <nz-form-label [nzSpan]="24">Access roles</nz-form-label>
+          <nz-form-control [nzSpan]="24" nzExtra="RBAC roles that can view this CR and control sessions (launch, stop, watch). Separate from implementer assignment. Leave empty for everyone.">
+            <nz-select
+              formControlName="allowedRoles"
+              nzMode="multiple"
+              nzPlaceHolder="Select access roles"
+              [nzDisabled]="isSubmitting">
+              <nz-option *ngFor="let role of roleOptions" [nzValue]="role" [nzLabel]="role" />
+            </nz-select>
+          </nz-form-control>
+        </nz-form-item>
+
+        <nz-form-item>
+          <nz-form-label [nzSpan]="24">Comments</nz-form-label>
+          <nz-form-control [nzSpan]="24">
+            <textarea nz-input rows="3" formControlName="comments" placeholder="Optional comment for approvers" ></textarea>
+          </nz-form-control>
+        </nz-form-item>
+      </form>
+    </ng-container>
+  </nz-spin>
+</nz-modal>
+
+<!-- Details Drawer -->
+<nz-drawer
+  [(nzVisible)]="isDrawerOpen"
+  nzTitle="Request Details"
+  nzPlacement="right"
+  nzWidth="400px"
+  (nzOnClose)="isDrawerOpen = false">
+  <ng-container *nzDrawerContent>
+    <div *ngIf="selectedRequest" class="drawer-content">
+      <div class="detail-row">
+        <strong>CR ID:</strong>
+        <span nz-tooltip [nzTooltipTitle]="selectedRequest.id">{{ crNumber(selectedRequest) }}</span>
+      </div>
+      <ng-container *ngFor="let model of changeRequestModel">
+        <ng-container [ngSwitch]="model.type">
+          <div *ngSwitchCase="'status'" class="detail-row">
+            <strong>Status:</strong>
+            <nz-tag [nzColor]="getStatusColor(selectedRequest.status)">{{ selectedRequest.status }}</nz-tag>
+          </div>
+          <div *ngSwitchCase="'date'" class="detail-row">
+            <strong>{{ model.display }}:</strong>
+            <span>{{ selectedRequest[model.id] | date: 'medium' }}</span>
+          </div>
+          <div *ngSwitchDefault class="detail-row">
+            <strong>{{ model.display }}:</strong>
+            <span>{{ selectedRequest[model.id] }}</span>
+          </div>
+        </ng-container>
+      </ng-container>
+      <nz-divider></nz-divider>
+      <h4>Activities</h4>
+      <ul class="activity-list" *ngIf="selectedRequest.activities?.length; else noActivities">
+        <li *ngFor="let activity of selectedRequest.activities">{{ activity }}</li>
+      </ul>
+      <ng-template #noActivities><p class="empty-note">No activities listed.</p></ng-template>
+
+      <h4>Virtual machines</h4>
+      <div class="tag-list" *ngIf="selectedRequest.vmIds?.length; else noVms">
+        <nz-tag *ngFor="let hostname of vmHostnames(selectedRequest.vmIds)">{{ hostname }}</nz-tag>
+      </div>
+      <ng-template #noVms><p class="empty-note">No VMs attached.</p></ng-template>
+
+      <h4>Implementer groups</h4>
+      <div class="tag-list" *ngIf="selectedRequest.implementerGroupIds?.length; else noImplementers">
+        <nz-tag *ngFor="let name of implementerGroupNames(selectedRequest.implementerGroupIds)" nzColor="blue">{{ name }}</nz-tag>
+      </div>
+      <ng-template #noImplementers><p class="empty-note">No implementer groups assigned.</p></ng-template>
+
+      <h4>Access roles</h4>
+      <div class="tag-list" *ngIf="selectedRequest.allowedRoles?.length; else allGroups">
+        <nz-tag *ngFor="let role of selectedRequest.allowedRoles" nzColor="purple">{{ role }}</nz-tag>
+      </div>
+      <ng-template #allGroups><p class="empty-note">Visible to all access roles.</p></ng-template>
+
+      <nz-divider></nz-divider>
+      <h4>Approval history</h4>
+      <ul class="history-list">
+        <li *ngFor="let entry of selectedRequest.history">
+          <strong>{{ entry.action }}</strong> by {{ entry.actor }} on {{ entry.when }}
+          <p>{{ entry.note }}</p>
+        </li>
+      </ul>
+    </div>
+  </ng-container>
+</nz-drawer>

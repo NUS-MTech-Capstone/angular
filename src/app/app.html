@@ -1,0 +1,61 @@
+<nz-layout class="app-layout">
+  <nz-header class="top-header">
+    <div class="brand">DenDenMushi</div>
+    <div class="header-right">
+      @if (auth.user(); as user) {
+        <div class="role-tags">
+          @for (role of user.roles; track role) {
+            <nz-tag class="role-tag" nzColor="purple">{{ role }}</nz-tag>
+          }
+        </div>
+        <span nz-icon nzType="bell" class="bell-icon"></span>
+        <div class="user-menu" nz-dropdown [nzDropdownMenu]="userMenu" nzTrigger="click">
+          <nz-avatar class="user-avatar" [nzText]="avatarInitial"></nz-avatar>
+          <span class="user-name">{{ displayName }}</span>
+          <span nz-icon nzType="down" class="chevron-icon"></span>
+        </div>
+        <nz-dropdown-menu #userMenu="nzDropdownMenu">
+          <ul nz-menu>
+            <li nz-menu-item (click)="goToProfile()">
+              <span nz-icon nzType="user"></span>
+              View Profile
+            </li>
+            <li nz-menu-divider></li>
+            <li nz-menu-item (click)="logout()">
+              <span nz-icon nzType="logout"></span>
+              Logout
+            </li>
+          </ul>
+        </nz-dropdown-menu>
+      }
+    </div>
+  </nz-header>
+  <nz-layout class="body-layout">
+    @if (!isTerminalRoute && !isAuthPage && auth.isAuthenticated) {
+    <nz-sider class="icon-rail" nzTheme="light" nzWidth="92px">
+      <ul class="rail-menu">
+        @for (item of navItems; track item.label) {
+          @if (canShow(item)) {
+            @if (item.link) {
+              <li class="rail-item" [routerLink]="item.link" routerLinkActive="active">
+                <span nz-icon [nzType]="item.icon"></span>
+                <span class="rail-label">{{ item.label }}</span>
+              </li>
+            } @else {
+              <li class="rail-item disabled">
+                <span nz-icon [nzType]="item.icon"></span>
+                <span class="rail-label">{{ item.label }}</span>
+              </li>
+            }
+          }
+        }
+      </ul>
+    </nz-sider>
+    }
+    <nz-content [class.terminal-mode]="isTerminalRoute">
+      <div class="inner-content" [class.terminal-inner]="isTerminalRoute">
+        <router-outlet></router-outlet>
+      </div>
+    </nz-content>
+  </nz-layout>
+</nz-layout>

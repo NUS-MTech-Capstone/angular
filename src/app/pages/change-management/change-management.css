@@ -1,0 +1,75 @@
+.drawer-content {
+  padding: 0;
+}
+
+.detail-row {
+  display: flex;
+  margin-bottom: 16px;
+}
+
+.detail-row strong {
+  min-width: 120px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.85);
+}
+
+.detail-row span {
+  flex: 1;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+.history-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.history-list li {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.history-list li:last-child {
+  border-bottom: none;
+}
+
+.history-list strong {
+  color: rgba(0, 0, 0, 0.85);
+}
+
+.history-list p {
+  margin: 4px 0 0 0;
+  color: rgba(0, 0, 0, 0.65);
+  font-size: 12px;
+}
+
+.activity-list {
+  margin: 0 0 16px;
+  padding-left: 20px;
+  color: rgba(0, 0, 0, 0.75);
+}
+
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.tag-list nz-tag {
+  margin: 0;
+}
+
+.empty-note {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  margin: 0 0 16px;
+}
+
+.cr-id {
+  font-family: monospace;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: help;
+}

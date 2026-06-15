@@ -1,0 +1,14 @@
+/node_modules
+/.angular
+/dist
+/coverage
+
+*.log
+.DS_Store
+
+/.idea
+/.vscode/*
+!/.vscode/extensions.json
+!/.vscode/launch.json
+!/.vscode/settings.json
+!/.vscode/tasks.json

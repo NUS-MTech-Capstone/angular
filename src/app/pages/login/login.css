@@ -1,0 +1,66 @@
+.login-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+}
+
+.login-card {
+  width: 420px;
+  max-width: 90vw;
+}
+
+.login-brand {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.login-brand h1 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.login-brand p {
+  margin: 4px 0 0;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.login-error {
+  margin-bottom: 16px;
+}
+
+.sso-hint {
+  margin-top: 12px;
+  text-align: center;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+
+.dev-hint {
+  margin-bottom: 12px;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+.dev-user-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dev-user-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: auto;
+  padding: 8px 12px;
+}
+
+.dev-user-name {
+  font-weight: 500;
+}
+
+.dev-user-roles {
+  display: flex;
+  gap: 4px;
+}

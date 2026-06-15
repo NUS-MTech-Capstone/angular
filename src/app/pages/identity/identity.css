@@ -1,0 +1,39 @@
+.tab-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+}
+
+.tab-description {
+  color: rgba(0, 0, 0, 0.65);
+  font-size: 13px;
+  margin: 0 0 16px;
+  max-width: 720px;
+}
+
+.policy-table .permission-cell {
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 13px;
+}
+
+.policy-table .role-col {
+  text-align: center;
+}
+
+.roles-select {
+  width: 100%;
+}
+
+.section-title {
+  margin: 24px 0 12px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.members-toolbar {
+  margin-bottom: 12px;
+}
+
+.group-select {
+  width: 280px;
+}

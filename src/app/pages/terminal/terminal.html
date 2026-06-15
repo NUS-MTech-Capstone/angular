@@ -1,0 +1,136 @@
+<div class="terminal-page" [class.bell-flash]="bellFlash">
+  <div class="terminal-toolbar">
+    <div class="session-info">
+      <span class="status-dot" [class.disconnected]="!connected"></span>
+      <span class="session-target">{{ osUser }}&#64;{{ hostname }} ({{ ip }})</span>
+      <span class="session-cr">{{ crNumber }}</span>
+      <span class="session-state">{{ connected ? 'Connected' : 'Disconnected' }}</span>
+    </div>
+    <div class="toolbar-actions">
+      <button nz-button nzType="text" class="toolbar-btn" nz-tooltip="Copy all to clipboard" (click)="copyAll()">
+        <span nz-icon nzType="copy"></span>
+      </button>
+      <button nz-button nzType="text" class="toolbar-btn" nz-tooltip="Paste" (click)="pasteFromClipboard()">
+        <span nz-icon nzType="snippets"></span>
+      </button>
+      <button nz-button nzType="text" class="toolbar-btn" nz-tooltip="Clear scrollback" (click)="clearScrollback()">
+        <span nz-icon nzType="clear"></span>
+      </button>
+      <button nz-button nzType="text" class="toolbar-btn" nz-tooltip="Reset terminal" (click)="resetTerminal()">
+        <span nz-icon nzType="reload"></span>
+      </button>
+      <button
+        nz-button
+        nzType="text"
+        class="toolbar-btn"
+        nz-tooltip="Reconnect session"
+        [disabled]="connected"
+        (click)="reconnect()">
+        <span nz-icon nzType="sync"></span>
+      </button>
+      <button nz-button nzType="text" class="toolbar-btn" nz-tooltip="Download session log" (click)="downloadLog()">
+        <span nz-icon nzType="download"></span>
+      </button>
+      <button nz-button nzType="text" class="toolbar-btn" nz-tooltip="Event log" (click)="isEventLogOpen = true">
+        <span nz-icon nzType="file-text"></span>
+      </button>
+      <button nz-button nzType="text" class="toolbar-btn" nz-tooltip="Full screen" (click)="toggleFullscreen()">
+        <span nz-icon nzType="fullscreen"></span>
+      </button>
+      <button nz-button nzType="text" class="toolbar-btn" nz-tooltip="Settings" (click)="isSettingsOpen = true">
+        <span nz-icon nzType="setting"></span>
+      </button>
+    </div>
+  </div>
+  <div #terminalHost class="terminal-host" (contextmenu)="onContextMenu($event)"></div>
+</div>
+
+<nz-drawer
+  [(nzVisible)]="isSettingsOpen"
+  nzTitle="Terminal settings"
+  nzPlacement="right"
+  nzWidth="340px"
+  (nzOnClose)="isSettingsOpen = false">
+  <ng-container *nzDrawerContent>
+    <div class="settings-section">
+      <h4>Appearance</h4>
+      <div class="setting-row">
+        <span class="setting-label">Colour theme</span>
+        <nz-select [(ngModel)]="settings.theme" (ngModelChange)="applySettings()" class="setting-control">
+          <nz-option *ngFor="let theme of themeOptions" [nzValue]="theme" [nzLabel]="theme" />
+        </nz-select>
+      </div>
+      <div class="setting-row">
+        <span class="setting-label">Font</span>
+        <nz-select [(ngModel)]="settings.fontFamily" (ngModelChange)="applySettings()" class="setting-control">
+          <nz-option *ngFor="let font of fontOptions" [nzValue]="font" [nzLabel]="font.split(',')[0]" />
+        </nz-select>
+      </div>
+      <div class="setting-row">
+        <span class="setting-label">Font size</span>
+        <nz-input-number
+          [(ngModel)]="settings.fontSize"
+          (ngModelChange)="applySettings()"
+          [nzMin]="8"
+          [nzMax]="32"
+          class="setting-control" />
+      </div>
+      <div class="setting-row">
+        <span class="setting-label">Cursor style</span>
+        <nz-select [(ngModel)]="settings.cursorStyle" (ngModelChange)="applySettings()" class="setting-control">
+          <nz-option nzValue="block" nzLabel="Block" />
+          <nz-option nzValue="underline" nzLabel="Underline" />
+          <nz-option nzValue="bar" nzLabel="Vertical bar" />
+        </nz-select>
+      </div>
+      <div class="setting-row">
+        <span class="setting-label">Cursor blink</span>
+        <nz-switch [(ngModel)]="settings.cursorBlink" (ngModelChange)="applySettings()"></nz-switch>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h4>Behaviour</h4>
+      <div class="setting-row">
+        <span class="setting-label">Scrollback lines</span>
+        <nz-input-number
+          [(ngModel)]="settings.scrollback"
+          (ngModelChange)="applySettings()"
+          [nzMin]="100"
+          [nzMax]="100000"
+          [nzStep]="100"
+          class="setting-control" />
+      </div>
+      <div class="setting-row">
+        <span class="setting-label">Visual bell</span>
+        <nz-switch [(ngModel)]="settings.visualBell" (ngModelChange)="applySettings()"></nz-switch>
+      </div>
+      <div class="setting-row">
+        <span class="setting-label">Copy on select</span>
+        <nz-switch [(ngModel)]="settings.copyOnSelect" (ngModelChange)="applySettings()"></nz-switch>
+      </div>
+      <div class="setting-row">
+        <span class="setting-label">Right-click paste</span>
+        <nz-switch [(ngModel)]="settings.rightClickPaste" (ngModelChange)="applySettings()"></nz-switch>
+      </div>
+    </div>
+
+    <button nz-button nzBlock (click)="restoreDefaultSettings()">Restore defaults</button>
+  </ng-container>
+</nz-drawer>
+
+<nz-modal
+  [(nzVisible)]="isEventLogOpen"
+  nzTitle="Event log"
+  [nzFooter]="null"
+  nzWidth="480px"
+  (nzOnCancel)="isEventLogOpen = false">
+  <ng-container *nzModalContent>
+    <ul class="event-log">
+      <li *ngFor="let entry of eventLog">
+        <span class="event-time">{{ entry.when }}</span>
+        <span>{{ entry.message }}</span>
+      </li>
+    </ul>
+  </ng-container>
+</nz-modal>

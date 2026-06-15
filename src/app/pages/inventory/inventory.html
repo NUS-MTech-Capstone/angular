@@ -1,0 +1,289 @@
+<nz-tabs
+  [nzSelectedIndex]="activeMainTab === 'servers' ? 0 : 1"
+  (nzSelectedIndexChange)="selectMainTab($event === 0 ? 'servers' : 'approvals')">
+  <nz-tab nzTitle="Servers"></nz-tab>
+  <nz-tab nzTitle="Approval queue"></nz-tab>
+</nz-tabs>
+
+<ng-container *ngIf="activeMainTab === 'servers'">
+  <div class="header-actions" style="justify-content: space-between; text-align: right; margin-bottom: 16px;">
+    <button nz-button nzType="primary" *ngIf="can('inventory.request')" (click)="openAddModal()">
+      <i nz-icon nzType="plus"></i>
+      Request new server
+    </button>
+  </div>
+
+  <div class="page-grid">
+    <div class="table-panel">
+      <nz-card
+        [nzTitle]="showsFullInventory
+          ? 'Virtual machine inventory (' + virtualMachines.length + ')'
+          : 'Your accessible servers (' + virtualMachines.length + ')'">
+        <p *ngIf="!showsFullInventory" class="inventory-note">
+          Showing servers assigned to your implementer groups. Use Access to launch SSH sessions.
+        </p>
+        <nz-table #vmTable [nzData]="virtualMachines" [nzLoading]="isLoading" nzBordered>
+          <thead>
+            <tr>
+              <th>Hostname</th>
+              <th>IP address</th>
+              <th>Asset status</th>
+              <th>OS version</th>
+              <th>SSH port</th>
+              <th>Updated</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let vm of vmTable.data">
+              <td>{{ vm.hostname }}</td>
+              <td>{{ vm.ipAddress }}</td>
+              <td>
+                <nz-tag [nzColor]="getAssetStatusColor(vm.assetStatus)">{{ vm.assetStatus }}</nz-tag>
+              </td>
+              <td>{{ vm.osVersion }}</td>
+              <td>{{ vm.sshPort }}</td>
+              <td>{{ vm.updatedAt | date: 'short' }}</td>
+              <td>
+                <nz-space nzWrap>
+                  <button
+                    nz-button
+                    nzType="default"
+                    nzSize="small"
+                    [disabled]="hasPendingUpdate(vm) || !can('inventory.request')"
+                    (click)="editVm(vm)">
+                    Request update
+                  </button>
+                  <button
+                    nz-button
+                    nzType="default"
+                    nzDanger
+                    nzSize="small"
+                    [disabled]="!can('inventory.delete')"
+                    nz-popconfirm
+                    nzPopconfirmTitle="Delete this virtual machine?"
+                    nzOkText="Delete"
+                    nzCancelText="Cancel"
+                    (nzOnConfirm)="deleteVm(vm)">
+                    Delete
+                  </button>
+                </nz-space>
+              </td>
+            </tr>
+          </tbody>
+        </nz-table>
+      </nz-card>
+    </div>
+  </div>
+</ng-container>
+
+<ng-container *ngIf="activeMainTab === 'approvals'">
+  <nz-tabs
+    [nzSelectedIndex]="approvalTabOptions.indexOf(activeApprovalTab)"
+    (nzSelectedIndexChange)="selectApprovalTab($event)">
+    <nz-tab nzTitle="All"></nz-tab>
+    <nz-tab nzTitle="Pending"></nz-tab>
+    <nz-tab nzTitle="Approved"></nz-tab>
+    <nz-tab nzTitle="Rejected"></nz-tab>
+  </nz-tabs>
+
+  <div class="page-grid">
+    <div class="table-panel">
+      <nz-card nzTitle="Inventory change requests ({{ filteredChangeRequests.length }})">
+        <nz-table
+          #changeRequestTable
+          [nzData]="filteredChangeRequests"
+          [nzLoading]="isLoadingRequests"
+          nzBordered>
+          <thead>
+            <tr>
+              <th>Action</th>
+              <th>Hostname</th>
+              <th>Requester</th>
+              <th>Status</th>
+              <th>Submitted</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let request of changeRequestTable.data">
+              <td>
+                <nz-tag [nzColor]="getActionColor(request.action)">{{ request.action }}</nz-tag>
+              </td>
+              <td>{{ request.hostname }}</td>
+              <td>{{ request.requester }}</td>
+              <td>
+                <nz-tag [nzColor]="getApprovalStatusColor(request.status)">{{ request.status }}</nz-tag>
+              </td>
+              <td>{{ request.createdAt | date: 'short' }}</td>
+              <td>
+                <nz-space nzWrap>
+                  <button nz-button nzType="default" nzSize="small" (click)="viewChangeRequest(request)">
+                    View
+                  </button>
+                  <button
+                    nz-button
+                    nzType="primary"
+                    nzSize="small"
+                    [disabled]="request.status !== 'Pending' || !can('inventory.approve')"
+                    (click)="approveChangeRequest(request)">
+                    Approve
+                  </button>
+                  <button
+                    nz-button
+                    nzType="default"
+                    nzDanger
+                    nzSize="small"
+                    [disabled]="request.status !== 'Pending' || !can('inventory.approve')"
+                    (click)="rejectChangeRequest(request)">
+                    Reject
+                  </button>
+                </nz-space>
+              </td>
+            </tr>
+          </tbody>
+        </nz-table>
+      </nz-card>
+    </div>
+  </div>
+</ng-container>
+
+<nz-modal
+  [(nzVisible)]="isModalOpen"
+  [nzTitle]="editingVmId ? 'Request server update' : 'Request new server'"
+  nzCentered
+  nzWidth="600px"
+  [nzOkText]="'Submit for approval'"
+  [nzCancelText]="'Cancel'"
+  [nzOkLoading]="isSubmitting"
+  [nzCancelDisabled]="isSubmitting"
+  [nzMaskClosable]="!isSubmitting"
+  [nzKeyboard]="!isSubmitting"
+  (nzOnOk)="submitForm()"
+  (nzOnCancel)="resetForm()">
+  <nz-spin [nzSimple]="true" [nzSpinning]="isSubmitting">
+    <ng-container *nzModalContent>
+      <form nz-form [formGroup]="vmForm" (ngSubmit)="submitForm()">
+        <nz-form-item>
+          <nz-form-label [nzSpan]="24" nzRequired>Hostname</nz-form-label>
+          <nz-form-control [nzSpan]="24" nzErrorTip="Hostname is required">
+            <input nz-input formControlName="hostname" placeholder="e.g. web-server-01" />
+          </nz-form-control>
+        </nz-form-item>
+
+        <nz-form-item>
+          <nz-form-label [nzSpan]="24" nzRequired>IP address</nz-form-label>
+          <nz-form-control [nzSpan]="24" nzErrorTip="IP address is required">
+            <input nz-input formControlName="ipAddress" placeholder="e.g. 10.0.1.15" />
+          </nz-form-control>
+        </nz-form-item>
+
+        <nz-form-item>
+          <nz-form-label [nzSpan]="24" nzRequired>Asset status</nz-form-label>
+          <nz-form-control [nzSpan]="24">
+            <nz-select formControlName="assetStatus" [nzDisabled]="isSubmitting">
+              <nz-option
+                *ngFor="let status of assetStatusOptions"
+                [nzValue]="status"
+                [nzLabel]="status" />
+            </nz-select>
+          </nz-form-control>
+        </nz-form-item>
+
+        <nz-form-item>
+          <nz-form-label [nzSpan]="24" nzRequired>OS version</nz-form-label>
+          <nz-form-control [nzSpan]="24" nzErrorTip="OS version is required">
+            <input nz-input formControlName="osVersion" placeholder="e.g. Ubuntu 22.04" />
+          </nz-form-control>
+        </nz-form-item>
+
+        <nz-form-item>
+          <nz-form-label [nzSpan]="24" nzRequired>SSH port</nz-form-label>
+          <nz-form-control [nzSpan]="24" nzErrorTip="Enter a valid port (1-65535)">
+            <nz-input-number
+              formControlName="sshPort"
+              [nzMin]="1"
+              [nzMax]="65535"
+              [nzStep]="1"
+              style="width: 100%;" />
+          </nz-form-control>
+        </nz-form-item>
+
+        <nz-form-item>
+          <nz-form-label [nzSpan]="24">Comments</nz-form-label>
+          <nz-form-control [nzSpan]="24">
+            <textarea
+              nz-input
+              rows="3"
+              formControlName="comments"
+              placeholder="Optional notes for approvers"></textarea>
+          </nz-form-control>
+        </nz-form-item>
+      </form>
+    </ng-container>
+  </nz-spin>
+</nz-modal>
+
+<nz-drawer
+  [(nzVisible)]="isDrawerOpen"
+  nzTitle="Change request details"
+  nzPlacement="right"
+  nzWidth="420px"
+  (nzOnClose)="isDrawerOpen = false">
+  <ng-container *nzDrawerContent>
+    <div *ngIf="selectedChangeRequest" class="drawer-content">
+      <div class="detail-row">
+        <strong>Action:</strong>
+        <nz-tag [nzColor]="getActionColor(selectedChangeRequest.action)">
+          {{ selectedChangeRequest.action }}
+        </nz-tag>
+      </div>
+      <div class="detail-row">
+        <strong>Status:</strong>
+        <nz-tag [nzColor]="getApprovalStatusColor(selectedChangeRequest.status)">
+          {{ selectedChangeRequest.status }}
+        </nz-tag>
+      </div>
+      <div class="detail-row">
+        <strong>Requester:</strong>
+        <span>{{ selectedChangeRequest.requester }}</span>
+      </div>
+      <div class="detail-row">
+        <strong>Hostname:</strong>
+        <span>{{ selectedChangeRequest.hostname }}</span>
+      </div>
+      <div class="detail-row">
+        <strong>IP address:</strong>
+        <span>{{ selectedChangeRequest.ipAddress }}</span>
+      </div>
+      <div class="detail-row">
+        <strong>Asset status:</strong>
+        <span>{{ selectedChangeRequest.assetStatus }}</span>
+      </div>
+      <div class="detail-row">
+        <strong>OS version:</strong>
+        <span>{{ selectedChangeRequest.osVersion }}</span>
+      </div>
+      <div class="detail-row">
+        <strong>SSH port:</strong>
+        <span>{{ selectedChangeRequest.sshPort }}</span>
+      </div>
+      <div class="detail-row" *ngIf="selectedChangeRequest.comments">
+        <strong>Comments:</strong>
+        <span>{{ selectedChangeRequest.comments }}</span>
+      </div>
+      <div class="detail-row" *ngIf="selectedChangeRequest.approver">
+        <strong>Approver:</strong>
+        <span>{{ selectedChangeRequest.approver }}</span>
+      </div>
+      <nz-divider></nz-divider>
+      <h4>Approval history</h4>
+      <ul class="history-list">
+        <li *ngFor="let entry of selectedChangeRequest.history">
+          <strong>{{ entry.action }}</strong> by {{ entry.actor }} on {{ entry.when }}
+          <p>{{ entry.note }}</p>
+        </li>
+      </ul>
+    </div>
+  </ng-container>
+</nz-drawer>

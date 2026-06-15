@@ -1,0 +1,26 @@
+<div class="profile-page" *ngIf="auth.user() as user">
+  <nz-card class="profile-card">
+    <div class="profile-header">
+      <nz-avatar [nzText]="(user.name || user.username).charAt(0).toUpperCase()" nzSize="large" class="profile-avatar"></nz-avatar>
+      <div>
+        <h2>{{ user.name || user.username }}</h2>
+        <p class="profile-username">{{ user.username }}</p>
+      </div>
+      <button nz-button nzDanger class="logout-btn" (click)="logout()">Logout</button>
+    </div>
+
+    <nz-descriptions nzBordered [nzColumn]="1" nzSize="small">
+      <nz-descriptions-item nzTitle="Email">{{ user.email || '-' }}</nz-descriptions-item>
+      <nz-descriptions-item nzTitle="Roles">
+        <nz-tag *ngFor="let role of user.roles" nzColor="purple">{{ role }}</nz-tag>
+        <span *ngIf="user.roles.length === 0">No roles assigned</span>
+      </nz-descriptions-item>
+      <nz-descriptions-item nzTitle="Permissions">
+        <div class="permission-list">
+          <nz-tag *ngFor="let permission of user.permissions">{{ permission }}</nz-tag>
+          <span *ngIf="user.permissions.length === 0">No permissions granted</span>
+        </div>
+      </nz-descriptions-item>
+    </nz-descriptions>
+  </nz-card>
+</div>

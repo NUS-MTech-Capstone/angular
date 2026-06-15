@@ -1,0 +1,393 @@
+<nz-tabs>
+  <nz-tab nzTitle="User Accounts">
+    <div class="tab-actions">
+      <button nz-button nzType="primary" (click)="openCreateModal()">
+        <span nz-icon nzType="plus"></span>
+        Create user
+      </button>
+    </div>
+
+    <nz-table #usersTable [nzData]="users" [nzLoading]="isLoadingUsers" nzBordered>
+      <thead>
+        <tr>
+          <th>Username</th>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Status</th>
+          <th>Enabled</th>
+          <th>Roles</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let user of usersTable.data">
+          <td>{{ user.username }}</td>
+          <td>{{ user.name || '-' }}</td>
+          <td>{{ user.email || '-' }}</td>
+          <td>{{ user.status }}</td>
+          <td>
+            <nz-switch
+              [ngModel]="user.enabled"
+              (ngModelChange)="toggleUserEnabled(user, $event)"></nz-switch>
+          </td>
+          <td>
+            <nz-tag *ngFor="let role of user.roles" nzColor="purple">{{ role }}</nz-tag>
+          </td>
+          <td>
+            <button nz-button nzSize="small" (click)="openRolesModal(user)">Assign roles</button>
+          </td>
+        </tr>
+      </tbody>
+    </nz-table>
+  </nz-tab>
+
+  <nz-tab nzTitle="Access Policies">
+    <div class="tab-actions">
+      <button
+        nz-button
+        nzType="primary"
+        [disabled]="!policiesDirty"
+        [nzLoading]="isSavingPolicies"
+        (click)="savePolicies()">
+        Save policies
+      </button>
+    </div>
+
+    <nz-table
+      #policyTable
+      [nzData]="permissions"
+      [nzLoading]="isLoadingPolicies"
+      [nzShowPagination]="false"
+      nzBordered
+      class="policy-table">
+      <thead>
+        <tr>
+          <th>Permission</th>
+          <th *ngFor="let role of roles" class="role-col">{{ role }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let permission of policyTable.data">
+          <td class="permission-cell">{{ permission }}</td>
+          <td *ngFor="let role of roles" class="role-col">
+            <nz-switch
+              nzSize="small"
+              [ngModel]="hasPolicyPermission(role, permission)"
+              (ngModelChange)="togglePolicyPermission(role, permission, $event)"></nz-switch>
+          </td>
+        </tr>
+      </tbody>
+    </nz-table>
+  </nz-tab>
+
+  <nz-tab nzTitle="Implementer Groups">
+    <p class="tab-description">
+      Implementer groups are separate from access roles. Each group has dedicated OS users
+      used when launching SSH sessions. Assign groups to change requests in Change Management.
+    </p>
+    <div class="tab-actions">
+      <button nz-button nzType="primary" (click)="openCreateGroupModal()">
+        <span nz-icon nzType="plus"></span>
+        Create group
+      </button>
+    </div>
+
+    <nz-table
+      #groupsTable
+      [nzData]="implementerGroups"
+      [nzLoading]="isLoadingGroups"
+      nzBordered>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+          <th>OS Users</th>
+          <th>Default VMs</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let group of groupsTable.data">
+          <td>{{ group.name }}</td>
+          <td>{{ group.description || '-' }}</td>
+          <td>
+            <nz-tag *ngFor="let osUser of group.osUsers">{{ osUser }}</nz-tag>
+            <span *ngIf="!group.osUsers.length">-</span>
+          </td>
+          <td>
+            <nz-tag *ngFor="let vmId of group.vmIds">{{ vmLabel(vmId) }}</nz-tag>
+            <span *ngIf="!group.vmIds.length">-</span>
+          </td>
+          <td>
+            <button nz-button nzSize="small" (click)="openEditGroupModal(group)">Edit</button>
+            <button
+              nz-button
+              nzSize="small"
+              nzDanger
+              nz-popconfirm
+              nzPopconfirmTitle="Delete this implementer group?"
+              (nzOnConfirm)="deleteGroup(group)">
+              Delete
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </nz-table>
+  </nz-tab>
+
+  <nz-tab nzTitle="Group Membership">
+    <p class="tab-description">
+      Add users to implementer groups through an approval queue. Approved members
+      are linked to the group separately from access roles and OS users.
+    </p>
+    <div class="tab-actions">
+      <button nz-button nzType="primary" (click)="openMembershipModal()">
+        <span nz-icon nzType="plus"></span>
+        Request membership
+      </button>
+    </div>
+
+    <nz-tabs
+      [nzSelectedIndex]="membershipTabOptions.indexOf(membershipTab)"
+      (nzSelectedIndexChange)="onMembershipTabChange($event)">
+      <nz-tab nzTitle="Pending"></nz-tab>
+      <nz-tab nzTitle="Approved"></nz-tab>
+      <nz-tab nzTitle="Rejected"></nz-tab>
+      <nz-tab nzTitle="All"></nz-tab>
+    </nz-tabs>
+
+    <nz-table
+      #membershipTable
+      [nzData]="filteredMembershipRequests"
+      [nzLoading]="isLoadingMembership"
+      nzBordered>
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Group</th>
+          <th>Requester</th>
+          <th>Status</th>
+          <th>Created</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let request of membershipTable.data">
+          <td>{{ request.username }}</td>
+          <td>{{ groupName(request.implementerGroupId) }}</td>
+          <td>{{ request.requester }}</td>
+          <td><nz-tag [nzColor]="getStatusColor(request.status)">{{ request.status }}</nz-tag></td>
+          <td>{{ request.createdAt | date: 'short' }}</td>
+          <td>
+            <button
+              nz-button
+              nzSize="small"
+              nzType="primary"
+              *ngIf="request.status === 'Pending'"
+              (click)="approveMembership(request)">
+              Approve
+            </button>
+            <button
+              nz-button
+              nzSize="small"
+              nzDanger
+              *ngIf="request.status === 'Pending'"
+              (click)="rejectMembership(request)">
+              Reject
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </nz-table>
+
+    <h4 class="section-title">Group members</h4>
+    <div class="members-toolbar">
+      <nz-select
+        nzPlaceHolder="Select implementer group"
+        [(ngModel)]="selectedMembersGroupId"
+        (ngModelChange)="loadGroupMembers($event)"
+        class="group-select">
+        <nz-option
+          *ngFor="let group of implementerGroups"
+          [nzValue]="group.id"
+          [nzLabel]="group.name" />
+      </nz-select>
+    </div>
+    <nz-table
+      *ngIf="selectedMembersGroupId"
+      [nzData]="groupMembers"
+      [nzShowPagination]="false"
+      nzBordered
+      nzSize="small">
+      <thead>
+        <tr>
+          <th>Username</th>
+          <th>Joined</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let member of groupMembers">
+          <td>{{ member.username }}</td>
+          <td>{{ member.createdAt | date: 'short' }}</td>
+          <td>
+            <button
+              nz-button
+              nzSize="small"
+              nzDanger
+              nz-popconfirm
+              nzPopconfirmTitle="Remove this member?"
+              (nzOnConfirm)="removeGroupMember(member)">
+              Remove
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </nz-table>
+  </nz-tab>
+</nz-tabs>
+
+<nz-modal
+  [(nzVisible)]="isCreateModalOpen"
+  nzTitle="Create user"
+  nzCentered
+  [nzOkText]="'Create'"
+  [nzOkLoading]="isSubmittingUser"
+  (nzOnOk)="submitCreateUser()"
+  (nzOnCancel)="isCreateModalOpen = false">
+  <ng-container *nzModalContent>
+    <form nz-form [formGroup]="createForm">
+      <nz-form-item>
+        <nz-form-label [nzSpan]="24" nzRequired>Username</nz-form-label>
+        <nz-form-control [nzSpan]="24" nzErrorTip="Username is required">
+          <input nz-input formControlName="username" placeholder="jdoe" />
+        </nz-form-control>
+      </nz-form-item>
+      <nz-form-item>
+        <nz-form-label [nzSpan]="24" nzRequired>Email</nz-form-label>
+        <nz-form-control [nzSpan]="24" nzErrorTip="A valid email is required">
+          <input nz-input formControlName="email" placeholder="jdoe@example.com" />
+        </nz-form-control>
+      </nz-form-item>
+      <nz-form-item>
+        <nz-form-label [nzSpan]="24">Name</nz-form-label>
+        <nz-form-control [nzSpan]="24">
+          <input nz-input formControlName="name" placeholder="John Doe" />
+        </nz-form-control>
+      </nz-form-item>
+      <nz-form-item>
+        <nz-form-label [nzSpan]="24" nzRequired>Roles</nz-form-label>
+        <nz-form-control [nzSpan]="24" nzErrorTip="Select at least one role">
+          <nz-select formControlName="roles" nzMode="multiple" nzPlaceHolder="Select roles">
+            <nz-option *ngFor="let role of roles" [nzValue]="role" [nzLabel]="role" />
+          </nz-select>
+        </nz-form-control>
+      </nz-form-item>
+    </form>
+  </ng-container>
+</nz-modal>
+
+<nz-modal
+  [nzVisible]="!!rolesModalUser"
+  [nzTitle]="'Assign roles - ' + (rolesModalUser?.username || '')"
+  nzCentered
+  [nzOkText]="'Save'"
+  [nzOkLoading]="isSavingRoles"
+  (nzOnOk)="saveRoles()"
+  (nzOnCancel)="rolesModalUser = undefined">
+  <ng-container *nzModalContent>
+    <nz-select
+      [(ngModel)]="rolesDraft"
+      nzMode="multiple"
+      nzPlaceHolder="Select roles"
+      class="roles-select">
+      <nz-option *ngFor="let role of roles" [nzValue]="role" [nzLabel]="role" />
+    </nz-select>
+  </ng-container>
+</nz-modal>
+
+<nz-modal
+  [(nzVisible)]="isGroupModalOpen"
+  [nzTitle]="editingGroupId ? 'Edit implementer group' : 'Create implementer group'"
+  nzCentered
+  [nzOkText]="editingGroupId ? 'Save' : 'Create'"
+  [nzOkLoading]="isSubmittingGroup"
+  (nzOnOk)="submitGroupForm()"
+  (nzOnCancel)="isGroupModalOpen = false">
+  <ng-container *nzModalContent>
+    <form nz-form [formGroup]="groupForm">
+      <nz-form-item>
+        <nz-form-label [nzSpan]="24" nzRequired>Group name</nz-form-label>
+        <nz-form-control [nzSpan]="24" nzErrorTip="Name is required">
+          <input nz-input formControlName="name" placeholder="e.g. SG_INF_RHEL" />
+        </nz-form-control>
+      </nz-form-item>
+      <nz-form-item>
+        <nz-form-label [nzSpan]="24">Description</nz-form-label>
+        <nz-form-control [nzSpan]="24">
+          <textarea nz-input rows="2" formControlName="description" placeholder="Optional description"></textarea>
+        </nz-form-control>
+      </nz-form-item>
+      <nz-form-item>
+        <nz-form-label [nzSpan]="24">OS users</nz-form-label>
+        <nz-form-control [nzSpan]="24" nzExtra="SSH OS accounts for this group. Type a username and press Enter.">
+          <nz-select
+            formControlName="osUsers"
+            nzMode="tags"
+            nzPlaceHolder="e.g. osadm1, dbadm, appuser">
+          </nz-select>
+        </nz-form-control>
+      </nz-form-item>
+      <nz-form-item>
+        <nz-form-label [nzSpan]="24">Default VMs</nz-form-label>
+        <nz-form-control [nzSpan]="24" nzExtra="Inventory servers group members can access by default in Access and Inventory.">
+          <nz-select
+            formControlName="vmIds"
+            nzMode="multiple"
+            nzPlaceHolder="Select inventory VMs">
+            <nz-option
+              *ngFor="let vm of inventoryVms"
+              [nzValue]="vm.id"
+              [nzLabel]="vm.hostname + ' (' + vm.ipAddress + ')'" />
+          </nz-select>
+        </nz-form-control>
+      </nz-form-item>
+    </form>
+  </ng-container>
+</nz-modal>
+
+<nz-modal
+  [(nzVisible)]="isMembershipModalOpen"
+  nzTitle="Request group membership"
+  nzCentered
+  nzOkText="Submit request"
+  [nzOkLoading]="isSubmittingMembership"
+  (nzOnOk)="submitMembershipRequest()"
+  (nzOnCancel)="isMembershipModalOpen = false">
+  <ng-container *nzModalContent>
+    <form nz-form [formGroup]="membershipForm">
+      <nz-form-item>
+        <nz-form-label [nzSpan]="24" nzRequired>User</nz-form-label>
+        <nz-form-control [nzSpan]="24" nzErrorTip="Select a user">
+          <nz-select formControlName="username" nzPlaceHolder="Select user" nzShowSearch>
+            <nz-option *ngFor="let user of users" [nzValue]="user.username" [nzLabel]="user.username" />
+          </nz-select>
+        </nz-form-control>
+      </nz-form-item>
+      <nz-form-item>
+        <nz-form-label [nzSpan]="24" nzRequired>Implementer group</nz-form-label>
+        <nz-form-control [nzSpan]="24" nzErrorTip="Select a group">
+          <nz-select formControlName="implementerGroupId" nzPlaceHolder="Select group">
+            <nz-option *ngFor="let group of implementerGroups" [nzValue]="group.id" [nzLabel]="group.name" />
+          </nz-select>
+        </nz-form-control>
+      </nz-form-item>
+      <nz-form-item>
+        <nz-form-label [nzSpan]="24">Comments</nz-form-label>
+        <nz-form-control [nzSpan]="24">
+          <textarea nz-input rows="2" formControlName="comments" placeholder="Optional note for approvers"></textarea>
+        </nz-form-control>
+      </nz-form-item>
+    </form>
+  </ng-container>
+</nz-modal>
