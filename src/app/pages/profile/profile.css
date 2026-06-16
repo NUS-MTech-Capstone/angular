@@ -33,6 +33,10 @@
   margin-left: auto;
 }
 
+.role-alert {
+  margin-bottom: 24px;
+}
+
 .permission-list {
   display: flex;
   flex-wrap: wrap;

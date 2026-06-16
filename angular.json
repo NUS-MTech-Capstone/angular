@@ -29,7 +29,37 @@
                 "output": "/assets/"
               }
             ],
-            "styles": ["src/theme.less", "src/styles.css"]
+            "styles": [
+              "node_modules/ng-zorro-antd/style/index.css",
+              "node_modules/ng-zorro-antd/alert/style/index.css",
+              "node_modules/ng-zorro-antd/auto-complete/style/index.css",
+              "node_modules/ng-zorro-antd/avatar/style/index.css",
+              "node_modules/ng-zorro-antd/button/style/index.css",
+              "node_modules/ng-zorro-antd/card/style/index.css",
+              "node_modules/ng-zorro-antd/descriptions/style/index.css",
+              "node_modules/ng-zorro-antd/divider/style/index.css",
+              "node_modules/ng-zorro-antd/drawer/style/index.css",
+              "node_modules/ng-zorro-antd/dropdown/style/index.css",
+              "node_modules/ng-zorro-antd/empty/style/index.css",
+              "node_modules/ng-zorro-antd/form/style/index.css",
+              "node_modules/ng-zorro-antd/grid/style/index.css",
+              "node_modules/ng-zorro-antd/icon/style/index.css",
+              "node_modules/ng-zorro-antd/input/style/index.css",
+              "node_modules/ng-zorro-antd/input-number/style/index.css",
+              "node_modules/ng-zorro-antd/layout/style/index.css",
+              "node_modules/ng-zorro-antd/modal/style/index.css",
+              "node_modules/ng-zorro-antd/popconfirm/style/index.css",
+              "node_modules/ng-zorro-antd/select/style/index.css",
+              "node_modules/ng-zorro-antd/space/style/index.css",
+              "node_modules/ng-zorro-antd/spin/style/index.css",
+              "node_modules/ng-zorro-antd/switch/style/index.css",
+              "node_modules/ng-zorro-antd/table/style/index.css",
+              "node_modules/ng-zorro-antd/tabs/style/index.css",
+              "node_modules/ng-zorro-antd/tag/style/index.css",
+              "node_modules/ng-zorro-antd/tooltip/style/index.css",
+              "node_modules/ng-zorro-antd/typography/style/index.css",
+              "src/styles.css"
+            ]
           },
           "configurations": {
             "production": {

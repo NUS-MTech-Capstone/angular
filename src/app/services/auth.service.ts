@@ -61,6 +61,23 @@ export class AuthService {
     return this.userSignal()?.roles?.includes(role) ?? false;
   }
 
+  preferredLandingPath(): string {
+    const permissions = this.userSignal()?.permissions ?? [];
+    if (permissions.includes('access.view')) {
+      return '/access';
+    }
+    if (permissions.includes('inventory.view')) {
+      return '/inventory';
+    }
+    if (permissions.includes('change.view')) {
+      return '/change-management';
+    }
+    if (permissions.includes('identity.users.manage')) {
+      return '/identity';
+    }
+    return '/profile';
+  }
+
   getAuthConfig(): Promise<AuthConfig> {
     return firstValueFrom(this.http.get<AuthConfig>(apiPath('auth/config')));
   }

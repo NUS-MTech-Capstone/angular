@@ -29,7 +29,8 @@ export class Login implements OnInit {
 
   async ngOnInit(): Promise<void> {
     if (this.auth.isAuthenticated) {
-      this.router.navigate(['/access']);
+      await this.auth.ensureProfileLoaded();
+      this.router.navigate([this.auth.preferredLandingPath()]);
       return;
     }
 
@@ -49,7 +50,7 @@ export class Login implements OnInit {
     this.error = undefined;
     try {
       await this.auth.devLogin(username);
-      this.router.navigate(['/access']);
+      this.router.navigate([this.auth.preferredLandingPath()]);
     } catch {
       this.error = 'Dev login failed. Check that the backend is running.';
     } finally {

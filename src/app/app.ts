@@ -44,6 +44,7 @@ export class App {
   isAuthPage = false;
 
   navItems: NavItem[] = [
+    { label: 'Profile', icon: 'user', link: '/profile' },
     { label: 'Access', icon: 'safety', link: '/access', permission: 'access.view' },
     { label: 'Resources', icon: 'cluster', link: '/inventory', permission: 'inventory.view' },
     { label: 'Change Management', icon: 'file-sync', link: '/change-management', permission: 'change.view' },
@@ -63,10 +64,11 @@ export class App {
   }
 
   canShow(item: NavItem): boolean {
-    if (!item.link) {
-      return true;
-    }
-    return !item.permission || this.auth.hasPermission(item.permission);
+    return true;
+  }
+
+  isDisabled(item: NavItem): boolean {
+    return !item.link || (!!item.permission && !this.auth.hasPermission(item.permission));
   }
 
   get displayName(): string {

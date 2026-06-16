@@ -36,7 +36,7 @@
       <ul class="rail-menu">
         @for (item of navItems; track item.label) {
           @if (canShow(item)) {
-            @if (item.link) {
+            @if (!isDisabled(item)) {
               <li class="rail-item" [routerLink]="item.link" routerLinkActive="active">
                 <span nz-icon [nzType]="item.icon"></span>
                 <span class="rail-label">{{ item.label }}</span>
