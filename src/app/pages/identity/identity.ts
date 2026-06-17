@@ -7,6 +7,7 @@ import { NzCardModule } from 'ng-zorro-antd/card';
 import { NzFormModule } from 'ng-zorro-antd/form';
 import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzInputModule } from 'ng-zorro-antd/input';
+import { NzMessageService } from 'ng-zorro-antd/message';
 import { NzModalModule } from 'ng-zorro-antd/modal';
 import { NzSelectModule } from 'ng-zorro-antd/select';
 import { NzSwitchModule } from 'ng-zorro-antd/switch';
@@ -14,6 +15,7 @@ import { NzTableModule } from 'ng-zorro-antd/table';
 import { NzTabsModule } from 'ng-zorro-antd/tabs';
 import { NzTagModule } from 'ng-zorro-antd/tag';
 import { NzPopconfirmModule } from 'ng-zorro-antd/popconfirm';
+import { NzBadgeModule } from 'ng-zorro-antd/badge';
 import {
   IdentityService,
   ManagedUser,
@@ -29,6 +31,7 @@ import {
   InventoryService,
   VirtualMachine,
 } from '../../services/inventory.service';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-identity',
@@ -49,6 +52,7 @@ import {
     NzTabsModule,
     NzTagModule,
     NzPopconfirmModule,
+    NzBadgeModule,
   ],
   templateUrl: './identity.html',
   styleUrls: ['./identity.css'],
@@ -65,6 +69,10 @@ export class Identity implements OnInit {
   isCreateModalOpen = false;
   isSubmittingUser = false;
   policiesDirty = false;
+
+  // Audit search/filter
+  userSearchTerm = '';
+  selectedRoleFilter = '';
 
   implementerGroups: ImplementerGroup[] = [];
   inventoryVms: VirtualMachine[] = [];
@@ -101,6 +109,8 @@ export class Identity implements OnInit {
     private identityService: IdentityService,
     private implementerGroupService: ImplementerGroupService,
     private inventoryService: InventoryService,
+    private auth: AuthService,
+    private message: NzMessageService,
   ) {
     this.createForm = this.fb.group({
       username: [null as string | null, [Validators.required]],
@@ -121,6 +131,15 @@ export class Identity implements OnInit {
     });
   }
 
+  can(permission: string): boolean {
+    return this.auth.hasPermission(permission);
+  }
+
+  get currentUserName(): string {
+    const user = this.auth.user();
+    return user?.name || user?.username || 'admin';
+  }
+
   get filteredMembershipRequests(): ImplementerGroupMembershipRequest[] {
     if (this.membershipTab === 'All') {
       return this.membershipRequests;
@@ -130,6 +149,22 @@ export class Identity implements OnInit {
     );
   }
 
+  /** Users matching the search term and role filter. */
+  get filteredUsers(): ManagedUser[] {
+    const term = this.userSearchTerm.trim().toLowerCase();
+    return this.users.filter((user) => {
+      const matchesSearch =
+        !term ||
+        user.username.toLowerCase().includes(term) ||
+        (user.name ?? '').toLowerCase().includes(term) ||
+        (user.email ?? '').toLowerCase().includes(term);
+      const matchesRole =
+        !this.selectedRoleFilter ||
+        user.roles.includes(this.selectedRoleFilter);
+      return matchesSearch && matchesRole;
+    });
+  }
+
   onMembershipTabChange(index: number): void {
     this.membershipTab = this.membershipTabOptions[index];
   }
@@ -137,10 +172,14 @@ export class Identity implements OnInit {
   ngOnInit(): void {
     this.loadCatalog();
     this.loadUsers();
-    this.loadPolicies();
-    this.loadImplementerGroups();
-    this.loadMembershipRequests();
-    this.loadInventoryVms();
+    if (this.can('identity.policies.manage')) {
+      this.loadPolicies();
+    }
+    if (this.can('identity.users.manage')) {
+      this.loadImplementerGroups();
+      this.loadMembershipRequests();
+      this.loadInventoryVms();
+    }
   }
 
   private loadInventoryVms(): void {
@@ -149,7 +188,7 @@ export class Identity implements OnInit {
         this.inventoryVms = vms;
         this.cd.detectChanges();
       },
-      error: (err) => console.error('Error loading inventory VMs:', err),
+      error: () => this.message.error('Failed to load inventory VMs'),
     });
   }
 
@@ -160,7 +199,7 @@ export class Identity implements OnInit {
         this.permissions = [...catalog.permissions];
         this.cd.detectChanges();
       },
-      error: (err) => console.error('Error loading role catalog:', err),
+      error: () => this.message.error('Failed to load role catalog'),
     });
   }
 
@@ -172,8 +211,8 @@ export class Identity implements OnInit {
         this.isLoadingUsers = false;
         this.cd.detectChanges();
       },
-      error: (err) => {
-        console.error('Error loading users:', err);
+      error: () => {
+        this.message.error('Failed to load users');
         this.isLoadingUsers = false;
         this.cd.detectChanges();
       },
@@ -189,8 +228,8 @@ export class Identity implements OnInit {
         this.isLoadingPolicies = false;
         this.cd.detectChanges();
       },
-      error: (err) => {
-        console.error('Error loading policies:', err);
+      error: () => {
+        this.message.error('Failed to load policies');
         this.isLoadingPolicies = false;
         this.cd.detectChanges();
       },
@@ -214,10 +253,11 @@ export class Identity implements OnInit {
       next: () => {
         this.isSubmittingUser = false;
         this.isCreateModalOpen = false;
+        this.message.success('User created successfully');
         this.loadUsers();
       },
       error: (err) => {
-        console.error('Error creating user:', err);
+        this.message.error(err?.error?.message ?? 'Failed to create user');
         this.isSubmittingUser = false;
         this.cd.detectChanges();
       },
@@ -228,10 +268,11 @@ export class Identity implements OnInit {
     this.identityService.setUserStatus(user.username, enabled).subscribe({
       next: (updated) => {
         user.enabled = updated.enabled;
+        this.message.success(`User ${user.username} ${enabled ? 'enabled' : 'disabled'}`);
         this.cd.detectChanges();
       },
       error: (err) => {
-        console.error('Error updating user status:', err);
+        this.message.error(err?.error?.message ?? 'Failed to update user status');
         this.loadUsers();
       },
     });
@@ -253,11 +294,12 @@ export class Identity implements OnInit {
         next: (updated) => {
           this.rolesModalUser!.roles = updated.roles;
           this.isSavingRoles = false;
+          this.message.success('Roles updated');
           this.rolesModalUser = undefined;
           this.cd.detectChanges();
         },
         error: (err) => {
-          console.error('Error updating user roles:', err);
+          this.message.error(err?.error?.message ?? 'Failed to update roles');
           this.isSavingRoles = false;
           this.cd.detectChanges();
         },
@@ -292,10 +334,11 @@ export class Identity implements OnInit {
         this.policies = policies;
         this.policiesDirty = false;
         this.isSavingPolicies = false;
+        this.message.success('Policies saved');
         this.cd.detectChanges();
       },
       error: (err) => {
-        console.error('Error saving policies:', err);
+        this.message.error(err?.error?.message ?? 'Failed to save policies');
         this.isSavingPolicies = false;
         this.cd.detectChanges();
       },
@@ -312,8 +355,8 @@ export class Identity implements OnInit {
         this.isLoadingGroups = false;
         this.cd.detectChanges();
       },
-      error: (err) => {
-        console.error('Error loading implementer groups:', err);
+      error: () => {
+        this.message.error('Failed to load implementer groups');
         this.isLoadingGroups = false;
         this.cd.detectChanges();
       },
@@ -357,10 +400,11 @@ export class Identity implements OnInit {
       next: () => {
         this.isSubmittingGroup = false;
         this.isGroupModalOpen = false;
+        this.message.success(this.editingGroupId ? 'Group updated' : 'Group created');
         this.loadImplementerGroups();
       },
       error: (err) => {
-        console.error('Error saving implementer group:', err);
+        this.message.error(err?.error?.message ?? 'Failed to save group');
         this.isSubmittingGroup = false;
         this.cd.detectChanges();
       },
@@ -369,8 +413,11 @@ export class Identity implements OnInit {
 
   deleteGroup(group: ImplementerGroup): void {
     this.implementerGroupService.remove(group.id).subscribe({
-      next: () => this.loadImplementerGroups(),
-      error: (err) => console.error('Error deleting implementer group:', err),
+      next: () => {
+        this.message.success('Group deleted');
+        this.loadImplementerGroups();
+      },
+      error: (err) => this.message.error(err?.error?.message ?? 'Failed to delete group'),
     });
   }
 
@@ -388,8 +435,8 @@ export class Identity implements OnInit {
         this.isLoadingMembership = false;
         this.cd.detectChanges();
       },
-      error: (err) => {
-        console.error('Error loading membership requests:', err);
+      error: () => {
+        this.message.error('Failed to load membership requests');
         this.isLoadingMembership = false;
         this.cd.detectChanges();
       },
@@ -416,16 +463,18 @@ export class Identity implements OnInit {
       .createMembershipRequest({
         username: value.username,
         implementerGroupId: value.implementerGroupId,
+        requester: this.currentUserName,
         comments: value.comments || undefined,
       })
       .subscribe({
         next: () => {
           this.isSubmittingMembership = false;
           this.isMembershipModalOpen = false;
+          this.message.success('Membership request submitted');
           this.loadMembershipRequests();
         },
         error: (err) => {
-          console.error('Error creating membership request:', err);
+          this.message.error(err?.error?.message ?? 'Failed to submit request');
           this.isSubmittingMembership = false;
           this.cd.detectChanges();
         },
@@ -435,19 +484,23 @@ export class Identity implements OnInit {
   approveMembership(request: ImplementerGroupMembershipRequest): void {
     this.implementerGroupService.approveMembershipRequest(request.id).subscribe({
       next: () => {
+        this.message.success('Membership approved');
         this.loadMembershipRequests();
         if (this.selectedMembersGroupId === request.implementerGroupId) {
           this.loadGroupMembers(request.implementerGroupId);
         }
       },
-      error: (err) => console.error('Error approving membership:', err),
+      error: (err) => this.message.error(err?.error?.message ?? 'Failed to approve'),
     });
   }
 
   rejectMembership(request: ImplementerGroupMembershipRequest): void {
     this.implementerGroupService.rejectMembershipRequest(request.id).subscribe({
-      next: () => this.loadMembershipRequests(),
-      error: (err) => console.error('Error rejecting membership:', err),
+      next: () => {
+        this.message.success('Membership rejected');
+        this.loadMembershipRequests();
+      },
+      error: (err) => this.message.error(err?.error?.message ?? 'Failed to reject'),
     });
   }
 
@@ -458,7 +511,7 @@ export class Identity implements OnInit {
         this.groupMembers = members;
         this.cd.detectChanges();
       },
-      error: (err) => console.error('Error loading group members:', err),
+      error: (err) => this.message.error(err?.error?.message ?? 'Failed to load members'),
     });
   }
 
@@ -467,11 +520,12 @@ export class Identity implements OnInit {
       .removeMember(member.implementerGroupId, member.username)
       .subscribe({
         next: () => {
+          this.message.success('Member removed');
           if (this.selectedMembersGroupId) {
             this.loadGroupMembers(this.selectedMembersGroupId);
           }
         },
-        error: (err) => console.error('Error removing member:', err),
+        error: (err) => this.message.error(err?.error?.message ?? 'Failed to remove member'),
       });
   }
 
@@ -484,5 +538,17 @@ export class Identity implements OnInit {
       default:
         return 'orange';
     }
+  }
+
+  getRoleColor(role: string): string {
+    const map: Record<string, string> = {
+      Admin: 'red',
+      Manager: 'blue',
+      TechnicalStaff: 'cyan',
+      SecurityAnalyst: 'orange',
+      Auditor: 'gold',
+      Employee: 'default',
+    };
+    return map[role] ?? 'purple';
   }
 }

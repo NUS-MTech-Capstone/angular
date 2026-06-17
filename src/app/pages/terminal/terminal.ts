@@ -21,7 +21,7 @@ import { NzSwitchModule } from 'ng-zorro-antd/switch';
 import { NzTooltipModule } from 'ng-zorro-antd/tooltip';
 import { ITheme, Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
-import { controlPlanePath } from '../../core/api.constants';
+import { apiPath } from '../../core/api.constants';
 
 /** Packet type bytes for outgoing messages (server defines inbound types). */
 const enum PktType {
@@ -120,6 +120,8 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
   crNumber = 'CR2025012412';
   hostId = '';
   crId = '';
+  /** When set, skip sessions/start and reconnect to this existing session. */
+  reconnectSessionId = '';
 
   connected = false;
   connecting = false;
@@ -164,6 +166,7 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
     this.crNumber = params.get('cr') || this.crNumber;
     this.hostId = params.get('hostId') || 'host-dev-1';
     this.crId = params.get('crId') || 'cr-test-1';
+    this.reconnectSessionId = params.get('sessionId') || '';
     this.titleService.setTitle(`${this.osUser}@${this.ip} - DenDenMushi SSH`);
 
     this.loadSettings();
@@ -208,13 +211,42 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
     this.writeLine(`Connecting to ${this.hostname} (${this.ip})...`);
     this.logEvent(`Session requested as ${this.osUser}@${this.ip} (${this.crNumber})`);
 
+    if (this.reconnectSessionId) {
+      // UC: Reconnect Session — use stored gateway credentials for this session
+      this.http
+        .get<{ websocketUrl: string; sessionToken: string }>(
+          apiPath(`sessions/${this.reconnectSessionId}/token`),
+        )
+        .subscribe({
+          next: (session) => this.openWebSocket(session.websocketUrl, session.sessionToken),
+          error: () => {
+            // Gateway session may have expired; fall back to starting a fresh one
+            this.logEvent('Reconnect failed — starting new session');
+            this.reconnectSessionId = '';
+            this.startNewSession();
+          },
+        });
+    } else {
+      this.startNewSession();
+    }
+  }
+
+  private startNewSession(): void {
     this.http
-      .post<{ websocketUrl: string; sessionToken: string }>(
-        controlPlanePath('sessions/start'),
-        { hostId: this.hostId, crId: this.crId, connectionType: 'ssh' },
+      .post<{ websocketUrl: string; sessionToken: string; sessionId: string }>(
+        apiPath('sessions/start'),
+        {
+          hostId: this.hostId,
+          crId: this.crId,
+          osUser: this.osUser,
+          connectionType: 'ssh',
+        },
       )
       .subscribe({
-        next: (session) => this.openWebSocket(session.websocketUrl, session.sessionToken),
+        next: (session) => {
+          this.reconnectSessionId = session.sessionId ?? '';
+          this.openWebSocket(session.websocketUrl, session.sessionToken);
+        },
         error: (err) => {
           const msg: string =
             err?.error?.message ?? err?.message ?? 'Session start failed';
@@ -265,6 +297,10 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
       const reason = event.reason ? ` (${event.reason})` : '';
       this.writeLine(`\r\n\x1b[33mConnection closed${reason}.\x1b[0m`);
       this.logEvent(`WebSocket closed: code=${event.code}${reason}`);
+      // Notify backend so session state is updated (if not explicitly ended)
+      if (event.code !== 1000) {
+        this.notifyDisconnected();
+      }
       this.cd.detectChanges();
     };
   }
@@ -276,6 +312,14 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
     this.logEvent('Reconnect requested');
     this.connect();
     this.term.focus();
+  }
+
+  /** Called when the WebSocket closes unexpectedly to mark the session disconnected. */
+  private notifyDisconnected(): void {
+    if (!this.reconnectSessionId) return;
+    this.http
+      .patch(apiPath(`sessions/${this.reconnectSessionId}/disconnect`), {})
+      .subscribe({ error: () => {} });
   }
 
   private writeLine(text: string): void {

@@ -1,8 +1,10 @@
 import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { NzAlertModule } from 'ng-zorro-antd/alert';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzCardModule } from 'ng-zorro-antd/card';
+import { NzDatePickerModule } from 'ng-zorro-antd/date-picker';
 import { NzDividerModule } from 'ng-zorro-antd/divider';
 import { NzFormModule } from 'ng-zorro-antd/form';
 import { NzGridModule } from 'ng-zorro-antd/grid';
@@ -19,6 +21,7 @@ import { NzModalModule } from 'ng-zorro-antd/modal';
 import { NzDrawerModule } from 'ng-zorro-antd/drawer';
 import { NzSpinModule } from 'ng-zorro-antd/spin';
 import { NzTooltipModule } from 'ng-zorro-antd/tooltip';
+import { NzMessageService } from 'ng-zorro-antd/message';
 import { ChangeRequestService, ChangeRequest, ChangeRequestModel } from '../../services/change-request.service';
 import { AuthService, ALL_ROLES } from '../../services/auth.service';
 import { InventoryService, VirtualMachine } from '../../services/inventory.service';
@@ -33,6 +36,7 @@ import {
   imports: [
     CommonModule,
     ReactiveFormsModule,
+    NzAlertModule,
     NzButtonModule,
     NzCardModule,
     NzDividerModule,
@@ -46,12 +50,13 @@ import {
     NzTagModule,
     NzTabsModule,
     NzTypographyModule,
+    NzDatePickerModule,
     NzPopconfirmModule,
     NzModalModule,
     NzDrawerModule,
     NzSpinModule,
     NzTooltipModule,
-],
+  ],
   templateUrl: './change-management.html',
   styleUrls: ['./change-management.css'],
 })
@@ -63,6 +68,8 @@ export class ChangeManagement implements OnInit {
   changeForm!: FormGroup;
   selectedRequest?: ChangeRequest | any;
   editingRequestId?: string;
+  /** CR number of the ticket being cloned, set when clone modal is open. */
+  cloningFromCrNumber?: string;
   changeRequests: ChangeRequest[] = [];
   filteredRequests: ChangeRequest[] = [];
   isLoading = false;
@@ -72,18 +79,33 @@ export class ChangeManagement implements OnInit {
   implementerGroups: ImplementerGroup[] = [];
   roleOptions = ALL_ROLES;
 
+  /** Prevents past dates from being selectable in the date picker. */
+  readonly disabledDate = (current: Date): boolean =>
+    current < new Date(new Date().setHours(0, 0, 0, 0));
+
+  /** Reactive form validator: scheduled date must be now or in the future. */
+  readonly futureDateValidator = (control: import('@angular/forms').AbstractControl) => {
+    const value: Date | null = control.value;
+    if (!value) return null;
+    const now = new Date();
+    now.setSeconds(0, 0);
+    return value < now ? { pastDate: true } : null;
+  };
+
   constructor(
     private fb: FormBuilder,
-    private cd: ChangeDetectorRef, // 2. Inject this
+    private cd: ChangeDetectorRef,
     private changeRequestService: ChangeRequestService,
     private inventoryService: InventoryService,
     private implementerGroupService: ImplementerGroupService,
     private auth: AuthService,
+    private message: NzMessageService,
   ) {
     this.changeForm = this.fb.group({
       title: [null as string | null, [Validators.required]],
       description: [null as string | null, [Validators.required]],
       approvalRoute: ['Normal', [Validators.required]],
+      scheduledDate: [null as Date | null, [this.futureDateValidator]],
       comments: [null as string | null],
       activities: [[] as string[]],
       vmIds: [[] as string[]],
@@ -98,14 +120,45 @@ export class ChangeManagement implements OnInit {
     this.loadImplementerGroups();
   }
 
+  get currentUserName(): string {
+    const user = this.auth.user();
+    return user?.name || user?.username || '';
+  }
+
+  get modalTitle(): string {
+    if (this.cloningFromCrNumber) return `Clone from ${this.cloningFromCrNumber}`;
+    if (this.editingRequestId) return 'Edit change request';
+    return 'New change request';
+  }
+
   openCreateModal(): void {
     this.editingRequestId = undefined;
+    this.cloningFromCrNumber = undefined;
     this.changeForm.reset({
       approvalRoute: 'Normal',
+      scheduledDate: null,
       activities: [],
       vmIds: [],
       implementerGroupIds: [],
       allowedRoles: [],
+    });
+    this.isModalOpen = true;
+  }
+
+  /** Open the create modal pre-populated with the contents of an existing ticket. */
+  cloneRequest(source: ChangeRequest): void {
+    this.editingRequestId = undefined;
+    this.cloningFromCrNumber = this.crNumber(source);
+    this.changeForm.reset({
+      title: source.title,
+      description: source.description,
+      approvalRoute: source.approvalRoute,
+      scheduledDate: null,
+      comments: source.comments || null,
+      activities: [...(source.activities ?? [])],
+      vmIds: [...(source.vmIds ?? [])],
+      implementerGroupIds: [...(source.implementerGroupIds ?? [])],
+      allowedRoles: [...(source.allowedRoles ?? [])],
     });
     this.isModalOpen = true;
   }
@@ -116,7 +169,7 @@ export class ChangeManagement implements OnInit {
         this.implementerGroups = groups;
         this.cd.detectChanges();
       },
-      error: (err) => console.error('Error loading implementer groups:', err),
+      error: () => this.message.error('Failed to load implementer groups'),
     });
   }
 
@@ -140,9 +193,7 @@ export class ChangeManagement implements OnInit {
         this.vms = vms;
         this.cd.detectChanges();
       },
-      error: (err) => {
-        console.error('Error loading inventory VMs:', err);
-      },
+      error: () => this.message.error('Failed to load inventory VMs'),
     });
   }
 
@@ -179,14 +230,9 @@ export class ChangeManagement implements OnInit {
 
 
   filterRequests(): void {
-    this.isLoading = true;
-    this.filteredRequests = this.changeRequests.filter((request) => {
-      if (this.activeTab === 'All') {
-        return true;
-      }
-      return request.status === this.activeTab;
-    });
-    this.isLoading = false;
+    this.filteredRequests = this.changeRequests.filter(
+      (request) => this.activeTab === 'All' || request.status === this.activeTab,
+    );
   }
 
   selectTab(tab: 'All' | 'Pending' | 'Approved' | 'Rejected' | string): void {
@@ -202,17 +248,24 @@ export class ChangeManagement implements OnInit {
     }
 
     this.isSubmitting = true;
-    const formValue = this.changeForm.value;
+    const raw = this.changeForm.value;
+    const formValue = {
+      ...raw,
+      scheduledDate: raw.scheduledDate instanceof Date
+        ? raw.scheduledDate.toISOString()
+        : raw.scheduledDate ?? undefined,
+    };
 
     if (this.editingRequestId != null) {
       this.changeRequestService.update(this.editingRequestId, formValue).subscribe({
         next: () => {
           this.isSubmitting = false;
+          this.message.success('Change request updated');
           this.loadChangeRequests();
           this.resetForm();
         },
         error: (err) => {
-          console.error('Error updating change request:', err);
+          this.message.error(err?.error?.message ?? 'Update failed');
           this.isSubmitting = false;
         },
       });
@@ -220,32 +273,27 @@ export class ChangeManagement implements OnInit {
       this.changeRequestService.create(formValue).subscribe({
         next: () => {
           this.isSubmitting = false;
+          this.message.success('Change request created');
           this.loadChangeRequests();
           this.resetForm();
         },
         error: (err) => {
-          console.error('Error creating change request:', err);
+          this.message.error(err?.error?.message ?? 'Create failed');
           this.isSubmitting = false;
         },
       });
     }
   }
 
-  createChange(data: Partial<ChangeRequest>): void {
-    // This method is no longer needed but kept for reference
-  }
-
-  updateChange(data: Partial<ChangeRequest>): void {
-    // This method is no longer needed but kept for reference
-  }
-
   resetForm(): void {
     this.editingRequestId = undefined;
+    this.cloningFromCrNumber = undefined;
     this.selectedRequest = undefined;
     this.isModalOpen = false;
     this.isSubmitting = false;
     this.changeForm.reset({
       approvalRoute: 'Normal',
+      scheduledDate: null,
       activities: [],
       vmIds: [],
       implementerGroupIds: [],
@@ -259,10 +307,12 @@ export class ChangeManagement implements OnInit {
     }
 
     this.editingRequestId = request.id;
+    this.cloningFromCrNumber = undefined;
     this.changeForm.setValue({
       title: request.title,
       description: request.description,
       approvalRoute: request.approvalRoute,
+      scheduledDate: request.scheduledDate ? new Date(request.scheduledDate) : null,
       comments: request.comments || '',
       activities: request.activities || [],
       vmIds: request.vmIds || [],
@@ -276,10 +326,11 @@ export class ChangeManagement implements OnInit {
   approveRequest(request: ChangeRequest): void {
     this.changeRequestService.approve(request.id).subscribe({
       next: () => {
+        this.message.success('Change request approved');
         this.loadChangeRequests();
       },
       error: (err) => {
-        console.error('Error approving request:', err);
+        this.message.error(err?.error?.message ?? 'Approval failed');
       },
     });
   }
@@ -287,10 +338,11 @@ export class ChangeManagement implements OnInit {
   rejectRequest(request: ChangeRequest): void {
     this.changeRequestService.reject(request.id).subscribe({
       next: () => {
+        this.message.success('Change request rejected');
         this.loadChangeRequests();
       },
       error: (err) => {
-        console.error('Error rejecting request:', err);
+        this.message.error(err?.error?.message ?? 'Rejection failed');
       },
     });
   }
@@ -308,3 +360,4 @@ export class ChangeManagement implements OnInit {
     return this.auth.hasPermission(permission);
   }
 }
+

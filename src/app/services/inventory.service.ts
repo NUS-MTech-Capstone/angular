@@ -21,6 +21,7 @@ export interface VirtualMachine {
   assetStatus: AssetStatus;
   osVersion: string;
   sshPort: number;
+  tags: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -41,6 +42,38 @@ export interface InventoryChangeRequest {
   history: ApprovalHistoryItem[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CreateVmDto {
+  hostname: string;
+  ipAddress: string;
+  assetStatus?: AssetStatus;
+  osVersion: string;
+  sshPort?: number;
+  tags?: string[];
+}
+
+export interface UpdateVmDto {
+  hostname?: string;
+  ipAddress?: string;
+  assetStatus?: AssetStatus;
+  osVersion?: string;
+  sshPort?: number;
+}
+
+export interface SyncVmRecord {
+  hostname: string;
+  ipAddress: string;
+  assetStatus?: AssetStatus;
+  osVersion: string;
+  sshPort?: number;
+  tags?: string[];
+}
+
+export interface SyncResult {
+  created: number;
+  updated: number;
+  unchanged: number;
 }
 
 export interface CreateInventoryChangeRequestDto {
@@ -107,5 +140,24 @@ export class InventoryService {
       `${this.changeRequestsApiUrl}/${id}/reject`,
       {},
     );
+  }
+
+  setTags(id: string, tags: string[]): Observable<VirtualMachine> {
+    return this.http.patch<VirtualMachine>(`${this.vmsApiUrl}/${id}/tags`, { tags });
+  }
+
+  /** Admin direct create — bypasses change-request workflow. */
+  adminCreate(dto: CreateVmDto): Observable<VirtualMachine> {
+    return this.http.post<VirtualMachine>(this.vmsApiUrl, dto);
+  }
+
+  /** Admin direct update — bypasses change-request workflow. */
+  adminUpdate(id: string, dto: UpdateVmDto): Observable<VirtualMachine> {
+    return this.http.patch<VirtualMachine>(`${this.vmsApiUrl}/${id}`, dto);
+  }
+
+  /** Sync (upsert by hostname) from an external server payload. */
+  syncVms(servers: SyncVmRecord[]): Observable<SyncResult> {
+    return this.http.post<SyncResult>(`${this.vmsApiUrl}/sync`, { servers });
   }
 }

@@ -1,47 +1,110 @@
 <nz-tabs>
+
+  <!-- ─── User Accounts ────────────────────────────────────────────────── -->
   <nz-tab nzTitle="User Accounts">
-    <div class="tab-actions">
-      <button nz-button nzType="primary" (click)="openCreateModal()">
+
+    <!-- Toolbar: search + role filter + (admin-only) create button -->
+    <div class="users-toolbar">
+      <div class="users-filters">
+        <nz-input-group [nzPrefix]="searchIcon" class="search-input">
+          <input
+            nz-input
+            placeholder="Search by name, username or email…"
+            [(ngModel)]="userSearchTerm" />
+        </nz-input-group>
+        <ng-template #searchIcon><span nz-icon nzType="search"></span></ng-template>
+
+        <nz-select
+          [(ngModel)]="selectedRoleFilter"
+          nzPlaceHolder="All roles"
+          nzAllowClear
+          class="role-filter">
+          <nz-option *ngFor="let role of roles" [nzValue]="role" [nzLabel]="role" />
+        </nz-select>
+      </div>
+
+      <button
+        *ngIf="can('identity.users.manage')"
+        nz-button
+        nzType="primary"
+        (click)="openCreateModal()">
         <span nz-icon nzType="plus"></span>
         Create user
       </button>
     </div>
 
-    <nz-table #usersTable [nzData]="users" [nzLoading]="isLoadingUsers" nzBordered>
+    <nz-table
+      #usersTable
+      [nzData]="filteredUsers"
+      [nzLoading]="isLoadingUsers"
+      nzBordered
+      [nzShowSizeChanger]="true"
+      [nzPageSize]="20">
       <thead>
         <tr>
-          <th>Username</th>
-          <th>Name</th>
+          <th nzWidth="160px">Username</th>
+          <th nzWidth="160px">Name</th>
           <th>Email</th>
-          <th>Status</th>
-          <th>Enabled</th>
+          <th nzWidth="130px">Status</th>
+          <th nzWidth="80px" nzAlign="center">Enabled</th>
           <th>Roles</th>
-          <th>Actions</th>
+          <th *ngIf="can('identity.users.manage')" nzWidth="120px">Actions</th>
         </tr>
       </thead>
       <tbody>
         <tr *ngFor="let user of usersTable.data">
-          <td>{{ user.username }}</td>
-          <td>{{ user.name || '-' }}</td>
-          <td>{{ user.email || '-' }}</td>
-          <td>{{ user.status }}</td>
+          <td><strong>{{ user.username }}</strong></td>
+          <td>{{ user.name || '—' }}</td>
+          <td>{{ user.email || '—' }}</td>
           <td>
+            <nz-tag [nzColor]="user.status === 'CONFIRMED' ? 'green' : user.status === 'FORCE_CHANGE_PASSWORD' ? 'orange' : 'default'">
+              {{ user.status }}
+            </nz-tag>
+          </td>
+          <td nzAlign="center">
+            <!-- Admin: interactive toggle -->
             <nz-switch
+              *ngIf="can('identity.users.manage'); else enabledBadge"
               [ngModel]="user.enabled"
-              (ngModelChange)="toggleUserEnabled(user, $event)"></nz-switch>
+              (ngModelChange)="toggleUserEnabled(user, $event)"
+              nzSize="small">
+            </nz-switch>
+            <!-- View-only: badge -->
+            <ng-template #enabledBadge>
+              <nz-tag [nzColor]="user.enabled ? 'green' : 'red'">
+                {{ user.enabled ? 'Yes' : 'No' }}
+              </nz-tag>
+            </ng-template>
           </td>
           <td>
-            <nz-tag *ngFor="let role of user.roles" nzColor="purple">{{ role }}</nz-tag>
+            <nz-tag
+              *ngFor="let role of user.roles"
+              [nzColor]="getRoleColor(role)">
+              {{ role }}
+            </nz-tag>
+            <span *ngIf="!user.roles.length" class="muted">—</span>
           </td>
-          <td>
-            <button nz-button nzSize="small" (click)="openRolesModal(user)">Assign roles</button>
+          <td *ngIf="can('identity.users.manage')">
+            <button nz-button nzSize="small" (click)="openRolesModal(user)">
+              <span nz-icon nzType="edit"></span>
+              Roles
+            </button>
           </td>
         </tr>
       </tbody>
     </nz-table>
+
+    <!-- Result count -->
+    <p class="result-count">
+      Showing {{ filteredUsers.length }} of {{ users.length }} user{{ users.length === 1 ? '' : 's' }}
+      <ng-container *ngIf="selectedRoleFilter">
+        with role <strong>{{ selectedRoleFilter }}</strong>
+      </ng-container>
+    </p>
   </nz-tab>
 
-  <nz-tab nzTitle="Access Policies">
+  <!-- ─── Access Policies (admin only) ─────────────────────────────────── -->
+  <nz-tab *ngIf="can('identity.policies.manage')" nzTitle="Access Policies">
     <div class="tab-actions">
       <button
         nz-button
@@ -73,14 +136,16 @@
             <nz-switch
               nzSize="small"
               [ngModel]="hasPolicyPermission(role, permission)"
-              (ngModelChange)="togglePolicyPermission(role, permission, $event)"></nz-switch>
+              (ngModelChange)="togglePolicyPermission(role, permission, $event)">
+            </nz-switch>
           </td>
         </tr>
       </tbody>
     </nz-table>
   </nz-tab>
 
-  <nz-tab nzTitle="Implementer Groups">
+  <!-- ─── Implementer Groups (admin only) ──────────────────────────────── -->
+  <nz-tab *ngIf="can('identity.users.manage')" nzTitle="Implementer Groups">
     <p class="tab-description">
       Implementer groups are separate from access roles. Each group has dedicated OS users
       used when launching SSH sessions. Assign groups to change requests in Change Management.
@@ -109,14 +174,14 @@
       <tbody>
         <tr *ngFor="let group of groupsTable.data">
           <td>{{ group.name }}</td>
-          <td>{{ group.description || '-' }}</td>
+          <td>{{ group.description || '—' }}</td>
           <td>
             <nz-tag *ngFor="let osUser of group.osUsers">{{ osUser }}</nz-tag>
-            <span *ngIf="!group.osUsers.length">-</span>
+            <span *ngIf="!group.osUsers.length">—</span>
           </td>
           <td>
             <nz-tag *ngFor="let vmId of group.vmIds">{{ vmLabel(vmId) }}</nz-tag>
-            <span *ngIf="!group.vmIds.length">-</span>
+            <span *ngIf="!group.vmIds.length">—</span>
           </td>
           <td>
             <button nz-button nzSize="small" (click)="openEditGroupModal(group)">Edit</button>
@@ -135,7 +200,8 @@
     </nz-table>
   </nz-tab>
 
-  <nz-tab nzTitle="Group Membership">
+  <!-- ─── Group Membership (admin only) ────────────────────────────────── -->
+  <nz-tab *ngIf="can('identity.users.manage')" nzTitle="Group Membership">
     <p class="tab-description">
       Add users to implementer groups through an approval queue. Approved members
       are linked to the group separately from access roles and OS users.
@@ -245,7 +311,10 @@
       </tbody>
     </nz-table>
   </nz-tab>
+
 </nz-tabs>
+
+<!-- ─── Modals ────────────────────────────────────────────────────────── -->
 
 <nz-modal
   [(nzVisible)]="isCreateModalOpen"
@@ -289,7 +358,7 @@
 
 <nz-modal
   [nzVisible]="!!rolesModalUser"
-  [nzTitle]="'Assign roles - ' + (rolesModalUser?.username || '')"
+  [nzTitle]="'Assign roles — ' + (rolesModalUser?.username || '')"
   nzCentered
   [nzOkText]="'Save'"
   [nzOkLoading]="isSavingRoles"
@@ -340,7 +409,7 @@
       </nz-form-item>
       <nz-form-item>
         <nz-form-label [nzSpan]="24">Default VMs</nz-form-label>
-        <nz-form-control [nzSpan]="24" nzExtra="Inventory servers group members can access by default in Access and Inventory.">
+        <nz-form-control [nzSpan]="24" nzExtra="Inventory servers group members can access by default.">
           <nz-select
             formControlName="vmIds"
             nzMode="multiple"

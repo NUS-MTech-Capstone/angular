@@ -14,10 +14,6 @@ export const authGuard: CanActivateFn = async () => {
     await auth.ensureProfileLoaded();
   } catch {
     auth.clearSession();
-    if (auth.authMode === 'alb') {
-      window.location.assign('/ddm/auth/login');
-      return false;
-    }
     return router.createUrlTree(['/login']);
   }
 
@@ -40,10 +36,6 @@ export const permissionGuard =
       await auth.ensureProfileLoaded();
     } catch {
       auth.clearSession();
-      if (auth.authMode === 'alb') {
-        window.location.assign('/ddm/auth/login');
-        return false;
-      }
       return router.createUrlTree(['/login']);
     }
 

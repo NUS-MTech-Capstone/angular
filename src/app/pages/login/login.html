@@ -7,7 +7,7 @@
 
     <nz-alert *ngIf="error" nzType="error" [nzMessage]="error" nzShowIcon class="login-error"></nz-alert>
 
-    <ng-container *ngIf="mode === 'alb'; else devLogin">
+    <ng-container *ngIf="mode === 'cognito'; else devLogin">
       <button
         nz-button
         nzType="primary"

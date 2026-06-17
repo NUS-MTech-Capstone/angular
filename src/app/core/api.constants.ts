@@ -8,6 +8,3 @@ export const apiBaseUrl = `${environment.apiUrl}/${SERVICE_NAME}`;
 
 export const apiPath = (segment: string): string =>
   `${apiBaseUrl}/${segment}`;
-
-export const controlPlanePath = (segment: string): string =>
-  `${environment.apiUrl}/${segment}`;

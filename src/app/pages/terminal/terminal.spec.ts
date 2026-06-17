@@ -1,15 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute } from '@angular/router';
 import { Title } from '@angular/platform-browser';
-import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  TestRequest,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
 import { provideNzIcons } from 'ng-zorro-antd/icon';
 import { icons } from '../../icons-provider';
-import { controlPlanePath } from '../../core/api.constants';
 import { TerminalPage } from './terminal';
 
 vi.mock('@xterm/xterm', () => ({
@@ -17,7 +10,6 @@ vi.mock('@xterm/xterm', () => ({
     loadAddon = vi.fn();
     open = vi.fn();
     onData = vi.fn();
-    onBell = vi.fn();
     onSelectionChange = vi.fn();
     focus = vi.fn();
     dispose = vi.fn();
@@ -42,8 +34,6 @@ vi.mock('@xterm/addon-fit', () => ({
 describe('TerminalPage', () => {
   let component: TerminalPage;
   let fixture: ComponentFixture<TerminalPage>;
-  let httpMock: HttpTestingController;
-  let sessionRequest: TestRequest;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -69,21 +59,13 @@ describe('TerminalPage', () => {
           },
         },
         { provide: Title, useValue: { setTitle: vi.fn() } },
-        provideHttpClient(),
-        provideHttpClientTesting(),
       ],
     }).compileComponents();
 
-    httpMock = TestBed.inject(HttpTestingController);
     fixture = TestBed.createComponent(TerminalPage);
     component = fixture.componentInstance;
     fixture.detectChanges();
-    sessionRequest = httpMock.expectOne(controlPlanePath('sessions/start'));
     await fixture.whenStable();
-  });
-
-  afterEach(() => {
-    httpMock.verify();
   });
 
   it('should create', () => {
@@ -95,15 +77,5 @@ describe('TerminalPage', () => {
     expect(component.hostname).toBe('test-host');
     expect(component.ip).toBe('10.0.0.1');
     expect(component.crNumber).toBe('CR-TEST');
-  });
-
-  it('should start sessions through the same-origin control-plane path', () => {
-    expect(sessionRequest.request.method).toBe('POST');
-    expect(sessionRequest.request.body).toEqual({
-      hostId: 'host-dev-1',
-      crId: 'cr-test-1',
-      connectionType: 'ssh',
-    });
-    sessionRequest.flush({ message: 'unavailable' }, { status: 503, statusText: 'Unavailable' });
   });
 });

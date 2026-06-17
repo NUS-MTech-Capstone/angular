@@ -6,10 +6,13 @@ import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzEmptyModule } from 'ng-zorro-antd/empty';
 import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzInputModule } from 'ng-zorro-antd/input';
+import { NzMessageService } from 'ng-zorro-antd/message';
 import { NzSelectModule } from 'ng-zorro-antd/select';
 import { NzSpaceModule } from 'ng-zorro-antd/space';
 import { NzTableModule } from 'ng-zorro-antd/table';
 import { NzTagModule } from 'ng-zorro-antd/tag';
+import { NzPopconfirmModule } from 'ng-zorro-antd/popconfirm';
+import { NzSpinModule } from 'ng-zorro-antd/spin';
 import { AuthService } from '../../services/auth.service';
 import {
   AccessibleChangeRequest,
@@ -19,10 +22,12 @@ import {
   ImplementerGroup,
   ImplementerGroupService,
 } from '../../services/implementer-group.service';
+import { SessionsApiService, SessionRecord } from '../../services/sessions.service';
 import type { VirtualMachine } from '../../services/inventory.service';
 
 interface ActiveSession {
   crNumber: string;
+  crId: string;
   createdBy: string;
   lastActivity: string;
   osUser: string;
@@ -32,6 +37,8 @@ interface ActiveSession {
   canStop: boolean;
   canWatch: boolean;
   observer: string | null;
+  /** Backend session record ID (undefined for legacy in-memory sessions) */
+  sessionId?: string;
 }
 
 interface AccessServer {
@@ -59,7 +66,9 @@ interface AccessServer {
     NzEmptyModule,
     NzIconModule,
     NzInputModule,
+    NzPopconfirmModule,
     NzSelectModule,
+    NzSpinModule,
     NzSpaceModule,
     NzTableModule,
     NzTagModule,
@@ -71,6 +80,8 @@ export class Access implements OnInit {
   private auth = inject(AuthService);
   private changeRequestService = inject(ChangeRequestService);
   private implementerGroupService = inject(ImplementerGroupService);
+  private sessionsApi = inject(SessionsApiService);
+  private message = inject(NzMessageService);
   private cd = inject(ChangeDetectorRef);
 
   sections = ['Servers', 'Change Requests', 'Sessions', 'Proxies'];
@@ -88,6 +99,11 @@ export class Access implements OnInit {
   userImplementerGroups: ImplementerGroup[] = [];
   isLoading = false;
   isLoadingServers = false;
+
+  /** All active sessions from backend (for Sessions tab) */
+  allActiveSessions: SessionRecord[] = [];
+  isLoadingSessions = false;
+  sessionStatusFilter: 'active' | 'all' = 'active';
 
   /** Sessions persist per VM while switching between views in this page. */
   private sessionsByVmId = new Map<string, ActiveSession[]>();
@@ -117,6 +133,115 @@ export class Access implements OnInit {
     ) {
       this.onCrSelected(this.accessibleRequests[0].id);
     }
+    if (section === 'Sessions') {
+      this.loadAllSessions();
+    }
+  }
+
+  loadAllSessions(): void {
+    this.isLoadingSessions = true;
+    this.sessionsApi.listActive().subscribe({
+      next: (sessions) => {
+        this.allActiveSessions = sessions;
+        this.isLoadingSessions = false;
+        // Refresh per-server session lists too
+        this.syncServerSessions(sessions);
+        this.cd.detectChanges();
+      },
+      error: () => {
+        this.isLoadingSessions = false;
+        this.cd.detectChanges();
+      },
+    });
+  }
+
+  private syncServerSessions(backendSessions: SessionRecord[]): void {
+    const byHost = new Map<string, SessionRecord[]>();
+    for (const s of backendSessions) {
+      const list = byHost.get(s.hostId) ?? [];
+      list.push(s);
+      byHost.set(s.hostId, list);
+    }
+    // Update groupServers sessions lists
+    for (const server of this.groupServers) {
+      const active: ActiveSession[] = (byHost.get(server.vmId) ?? []).map((s) =>
+        this.backendToActiveSession(s),
+      );
+      server.sessions = active;
+      this.sessionsByVmId.set(server.vmId, active);
+    }
+    for (const server of this.crServers) {
+      const active: ActiveSession[] = (byHost.get(server.vmId) ?? []).map((s) =>
+        this.backendToActiveSession(s),
+      );
+      server.sessions = active;
+      this.sessionsByVmId.set(server.vmId, active);
+    }
+  }
+
+  private backendToActiveSession(s: SessionRecord): ActiveSession {
+    return {
+      crNumber: s.crNumber ?? 'Direct',
+      crId: s.crId ?? '',
+      createdBy: s.createdBy,
+      lastActivity: s.lastActivityAt ? new Date(s.lastActivityAt).toLocaleTimeString() : 'Active',
+      osUser: s.osUser,
+      currentImplementor: s.createdBy,
+      primaryAction: s.createdBy === this.currentUser ? 'Join' : 'Join',
+      primaryEnabled: true,
+      canStop: true,
+      canWatch: true,
+      observer: null,
+      sessionId: s.id,
+    };
+  }
+
+  get filteredAllSessions(): SessionRecord[] {
+    if (this.sessionStatusFilter === 'active') {
+      return this.allActiveSessions.filter((s) => s.status === 'active');
+    }
+    return this.allActiveSessions;
+  }
+
+  isMySession(session: SessionRecord): boolean {
+    return session.createdBy === this.currentUser;
+  }
+
+  sessionStatusColor(status: string): string {
+    switch (status) {
+      case 'active': return 'green';
+      case 'ended': return 'default';
+      case 'disconnected': return 'orange';
+      default: return 'default';
+    }
+  }
+
+  endBackendSession(session: SessionRecord): void {
+    this.sessionsApi.end(session.id).subscribe({
+      next: () => {
+        this.message.success(`Session on ${session.hostname} ended`);
+        this.loadAllSessions();
+      },
+      error: (err) =>
+        this.message.error(err?.error?.message ?? 'Failed to end session'),
+    });
+  }
+
+  reconnectBackendSession(session: SessionRecord): void {
+    const params = new URLSearchParams({
+      user: session.osUser,
+      host: session.hostname,
+      ip: session.ipAddress ?? '',
+      cr: session.crNumber ?? 'Direct',
+      hostId: session.hostId,
+      crId: session.crId ?? '',
+      sessionId: session.id,
+    });
+    window.open(`/terminal?${params.toString()}`, '_blank', 'popup=yes,width=1200,height=760');
+  }
+
+  joinBackendSession(session: SessionRecord): void {
+    this.reconnectBackendSession(session);
   }
 
   private loadAccessibleAssets(): void {
@@ -260,48 +385,46 @@ export class Access implements OnInit {
       this.activeSection === 'Change Requests' && this.selectedRequest
         ? this.crNumber(this.selectedRequest)
         : 'Direct';
-    const sessions = [
-      {
-        crNumber: crLabel,
-        createdBy: this.currentUser,
-        lastActivity: 'Just now',
-        osUser: server.selectedOsUser,
-        currentImplementor: this.currentUser,
-        primaryAction: 'Join' as const,
-        primaryEnabled: false,
-        canStop: true,
-        canWatch: true,
-        observer: null,
-      },
-      ...server.sessions,
-    ];
-    server.sessions = sessions;
-    this.sessionsByVmId.set(server.vmId, sessions);
-    this.openTerminalWindow(server, server.selectedOsUser, crLabel);
+    const crId =
+      this.activeSection === 'Change Requests' && this.selectedRequest
+        ? this.selectedRequest.id
+        : '';
+    this.openTerminalWindow(server, server.selectedOsUser, crLabel, crId);
+    // Refresh sessions list after a short delay to pick up the new session
+    setTimeout(() => this.loadAllSessions(), 2000);
   }
 
   joinSession(server: AccessServer, session: ActiveSession): void {
     session.currentImplementor = this.currentUser;
     session.primaryEnabled = false;
     session.lastActivity = 'Active';
-    this.openTerminalWindow(server, session.osUser, session.crNumber);
+    this.openTerminalWindow(
+      server,
+      session.osUser,
+      session.crNumber,
+      session.crId ?? '',
+      session.sessionId,
+    );
   }
 
   private openTerminalWindow(
     server: AccessServer,
     osUser: string,
     crLabel: string,
+    crId: string,
+    sessionId?: string,
   ): void {
-    const params = new URLSearchParams({
+    const p: Record<string, string> = {
       user: osUser,
       host: server.hostname,
       ip: server.ipAddress,
       cr: crLabel,
       hostId: server.vmId,
-      crId: crLabel,
-    });
+      crId,
+    };
+    if (sessionId) p['sessionId'] = sessionId;
     window.open(
-      `/terminal?${params.toString()}`,
+      `/terminal?${new URLSearchParams(p).toString()}`,
       '_blank',
       'popup=yes,width=1200,height=760',
     );
@@ -312,9 +435,21 @@ export class Access implements OnInit {
   }
 
   stopSession(server: AccessServer, session: ActiveSession): void {
-    const sessions = server.sessions.filter((s) => s !== session);
-    server.sessions = sessions;
-    this.sessionsByVmId.set(server.vmId, sessions);
+    if (session.sessionId) {
+      this.sessionsApi.end(session.sessionId).subscribe({
+        next: () => {
+          const sessions = server.sessions.filter((s) => s !== session);
+          server.sessions = sessions;
+          this.sessionsByVmId.set(server.vmId, sessions);
+          this.cd.detectChanges();
+        },
+        error: (err) => this.message.error(err?.error?.message ?? 'Failed to stop session'),
+      });
+    } else {
+      const sessions = server.sessions.filter((s) => s !== session);
+      server.sessions = sessions;
+      this.sessionsByVmId.set(server.vmId, sessions);
+    }
   }
 
   can(permission: string): boolean {

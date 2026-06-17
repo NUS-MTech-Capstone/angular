@@ -27,6 +27,7 @@ export interface ChangeRequest {
   vmIds: string[];
   allowedRoles: string[];
   implementerGroupIds: string[];
+  scheduledDate?: string;
 }
 
 /** A change request as served to the Access tab, with its VMs and implementer groups resolved. */
@@ -45,6 +46,7 @@ export interface CreateChangeRequestDto {
   vmIds?: string[];
   allowedRoles?: string[];
   implementerGroupIds?: string[];
+  scheduledDate?: string;
 }
 
 export interface UpdateChangeRequestDto {
@@ -56,6 +58,7 @@ export interface UpdateChangeRequestDto {
   vmIds?: string[];
   allowedRoles?: string[];
   implementerGroupIds?: string[];
+  scheduledDate?: string;
 }
 
 export const ChangeRequestModel = [
@@ -66,9 +69,9 @@ export const ChangeRequestModel = [
   {id: 'approvalRoute', display: 'Approval Route', type: 'default'},
   {id: 'status', display: 'Status', type: 'status'},
   {id: 'createdAt', display: 'Created At', type: 'date'},
+  {id: 'scheduledDate', display: 'Scheduled Date', type: 'date'},
   {id: 'approver', display: 'Approver', type: 'default'},
   {id: 'comments', display: 'Comments', type: 'default'},
-  // {id: 'history', display: 'History', type: 'default'}
 ];
 
 @Injectable({

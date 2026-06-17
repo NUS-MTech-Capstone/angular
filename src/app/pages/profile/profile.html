@@ -9,15 +9,6 @@
       <button nz-button nzDanger class="logout-btn" (click)="logout()">Logout</button>
     </div>
 
-    <nz-alert
-      *ngIf="user.roles.length === 0"
-      nzType="warning"
-      nzShowIcon
-      nzMessage="No Cognito role assigned"
-      nzDescription="Ask an administrator to add this user to a DenDenMushi Cognito group, then log out and sign in again."
-      class="role-alert"
-    ></nz-alert>
-
     <nz-descriptions nzBordered [nzColumn]="1" nzSize="small">
       <nz-descriptions-item nzTitle="Email">{{ user.email || '-' }}</nz-descriptions-item>
       <nz-descriptions-item nzTitle="Roles">

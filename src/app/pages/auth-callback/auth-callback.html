@@ -1,0 +1,10 @@
+<div class="callback-page">
+  <ng-container *ngIf="!error; else failed">
+    <nz-spin nzSize="large"></nz-spin>
+    <p>Signing you in...</p>
+  </ng-container>
+  <ng-template #failed>
+    <nz-alert nzType="error" nzMessage="Sign-in failed" [nzDescription]="error ?? ''" nzShowIcon></nz-alert>
+    <p class="retry"><a routerLink="/login">Back to login</a></p>
+  </ng-template>
+</div>

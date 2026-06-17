@@ -44,13 +44,12 @@ export class App {
   isAuthPage = false;
 
   navItems: NavItem[] = [
-    { label: 'Profile', icon: 'user', link: '/profile' },
     { label: 'Access', icon: 'safety', link: '/access', permission: 'access.view' },
     { label: 'Resources', icon: 'cluster', link: '/inventory', permission: 'inventory.view' },
     { label: 'Change Management', icon: 'file-sync', link: '/change-management', permission: 'change.view' },
     { label: 'Agentic AI', icon: 'robot', link: null },
-    { label: 'Audit', icon: 'audit', link: null },
-    { label: 'Identity', icon: 'idcard', link: '/identity', permission: 'identity.users.manage' },
+    { label: 'Monitoring', icon: 'dashboard', link: '/monitoring', permission: 'monitoring.view' },
+    { label: 'Identity', icon: 'idcard', link: '/identity', permission: 'identity.users.view' },
   ];
 
   constructor() {
@@ -64,11 +63,10 @@ export class App {
   }
 
   canShow(item: NavItem): boolean {
-    return true;
-  }
-
-  isDisabled(item: NavItem): boolean {
-    return !item.link || (!!item.permission && !this.auth.hasPermission(item.permission));
+    if (!item.link) {
+      return true;
+    }
+    return !item.permission || this.auth.hasPermission(item.permission);
   }
 
   get displayName(): string {

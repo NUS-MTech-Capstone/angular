@@ -9,6 +9,11 @@ export const routes: Routes = [
     loadChildren: () => import('./pages/login/login.routes').then((m) => m.LOGIN_ROUTES),
   },
   {
+    path: 'auth/callback',
+    data: { title: 'Signing in' },
+    loadChildren: () => import('./pages/auth-callback/auth-callback.routes').then((m) => m.AUTH_CALLBACK_ROUTES),
+  },
+  {
     path: 'profile',
     data: { title: 'Profile' },
     canActivate: [authGuard],
@@ -41,7 +46,13 @@ export const routes: Routes = [
   {
     path: 'identity',
     data: { title: 'Identity' },
-    canActivate: [authGuard, permissionGuard('identity.users.manage')],
+    canActivate: [authGuard, permissionGuard('identity.users.view')],
     loadChildren: () => import('./pages/identity/identity.routes').then((m) => m.IDENTITY_ROUTES),
+  },
+  {
+    path: 'monitoring',
+    data: { title: 'Monitoring' },
+    canActivate: [authGuard, permissionGuard('monitoring.view')],
+    loadChildren: () => import('./pages/monitoring/monitoring.routes').then((m) => m.MONITORING_ROUTES),
   },
 ];
