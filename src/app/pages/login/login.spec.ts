@@ -10,7 +10,7 @@ describe('Login', () => {
     isAuthenticated: boolean;
     getAuthConfig: ReturnType<typeof vi.fn>;
     devLogin: ReturnType<typeof vi.fn>;
-    loginWithSso: ReturnType<typeof vi.fn>;
+    loginWithAlb: ReturnType<typeof vi.fn>;
   };
   let router: { navigate: ReturnType<typeof vi.fn> };
 
@@ -19,7 +19,7 @@ describe('Login', () => {
       isAuthenticated: false,
       getAuthConfig: vi.fn().mockResolvedValue({ mode: 'dev', devUsers: [] }),
       devLogin: vi.fn().mockResolvedValue(undefined),
-      loginWithSso: vi.fn(),
+      loginWithAlb: vi.fn(),
     };
     router = { navigate: vi.fn() };
 

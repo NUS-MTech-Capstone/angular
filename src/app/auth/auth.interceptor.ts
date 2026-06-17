@@ -2,7 +2,7 @@ import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
-import { API_VERSION, API_VERSION_HEADER, apiBaseUrl } from '../core/api.constants';
+import { API_VERSION, API_VERSION_HEADER, apiBaseUrl, apiPath } from '../core/api.constants';
 import { AuthService } from '../services/auth.service';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
@@ -14,7 +14,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   if (isApiRequest) {
     headers[API_VERSION_HEADER] = API_VERSION;
-    if (auth.accessToken) {
+    if (auth.authMode === 'dev' && auth.accessToken) {
       headers['Authorization'] = `Bearer ${auth.accessToken}`;
     }
   }
@@ -30,10 +30,14 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         error instanceof HttpErrorResponse &&
         error.status === 401 &&
         isApiRequest &&
-        !req.url.includes('/ddm/auth/dev-login')
+        !req.url.includes('/auth/dev-login')
       ) {
         auth.clearSession();
-        router.navigate(['/login']);
+        if (auth.authMode === 'alb') {
+          window.location.href = apiPath('auth/login');
+        } else {
+          router.navigate(['/login']);
+        }
       }
       return throwError(() => error);
     }),

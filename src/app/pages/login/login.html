@@ -7,18 +7,17 @@
 
     <nz-alert *ngIf="error" nzType="error" [nzMessage]="error" nzShowIcon class="login-error"></nz-alert>
 
-    <ng-container *ngIf="mode === 'cognito'; else devLogin">
+    <ng-container *ngIf="mode === 'alb'; else devLogin">
       <button
         nz-button
         nzType="primary"
         nzBlock
         nzSize="large"
-        [nzLoading]="isSsoLoading"
-        (click)="loginWithSso()">
+        (click)="loginWithAlb()">
         <span nz-icon nzType="safety"></span>
-        Login via SSO
+        Login
       </button>
-      <p class="sso-hint">You will be redirected to the corporate identity provider.</p>
+      <p class="sso-hint">You will be redirected through the corporate sign-in flow.</p>
     </ng-container>
 
     <ng-template #devLogin>

@@ -6,7 +6,7 @@ export const authGuard: CanActivateFn = async () => {
   const auth = inject(AuthService);
   const router = inject(Router);
 
-  if (!auth.isAuthenticated) {
+  if (auth.authMode === 'dev' && !auth.isAuthenticated) {
     return router.createUrlTree(['/login']);
   }
 
@@ -26,12 +26,10 @@ export const permissionGuard =
     const auth = inject(AuthService);
     const router = inject(Router);
 
-    if (!auth.isAuthenticated) {
+    if (auth.authMode === 'dev' && !auth.isAuthenticated) {
       return router.createUrlTree(['/login']);
     }
 
-    // Guards on the same route run concurrently, so wait for the profile
-    // ourselves instead of relying on authGuard having finished first.
     try {
       await auth.ensureProfileLoaded();
     } catch {

@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
+import { apiPath } from '../core/api.constants';
 
 export interface MonitoringStatus {
   configured: boolean;
@@ -52,7 +53,7 @@ export interface AlertEvent {
 @Injectable({ providedIn: 'root' })
 export class MonitoringService {
   private http = inject(HttpClient);
-  private base = '/ddm/monitoring';
+  private base = apiPath('monitoring');
 
   getStatus(): Observable<MonitoringStatus> {
     return this.http.get<MonitoringStatus>(`${this.base}/status`);

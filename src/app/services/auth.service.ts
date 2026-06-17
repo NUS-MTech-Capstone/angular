@@ -21,7 +21,7 @@ export interface DevUserOption {
 }
 
 export interface AuthConfig {
-  mode: 'dev' | 'cognito';
+  mode: 'dev' | 'alb';
   devUsers: DevUserOption[];
 }
 
@@ -35,9 +35,6 @@ export const ALL_ROLES = [
 ];
 
 const ACCESS_TOKEN_KEY = 'ddm.accessToken';
-const ID_TOKEN_KEY = 'ddm.idToken';
-const PKCE_VERIFIER_KEY = 'ddm.pkceVerifier';
-const OAUTH_STATE_KEY = 'ddm.oauthState';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -54,6 +51,9 @@ export class AuthService {
   }
 
   get isAuthenticated(): boolean {
+    if (this.authMode === 'alb') {
+      return !!this.userSignal();
+    }
     return !!this.accessToken;
   }
 
@@ -71,8 +71,6 @@ export class AuthService {
     );
   }
 
-  // --- Dev mode login (no AWS required) ---
-
   async devLogin(username: string): Promise<void> {
     const response = await firstValueFrom(
       this.http.post<{ accessToken: string }>(
@@ -84,71 +82,12 @@ export class AuthService {
     await this.loadProfile();
   }
 
-  // --- Cognito Hosted UI login (OAuth2 authorization code + PKCE) ---
-
-  async loginWithSso(): Promise<void> {
-    const { verifier, challenge } = await this.generatePkce();
-    const state = this.base64Url(crypto.getRandomValues(new Uint8Array(16)));
-    sessionStorage.setItem(PKCE_VERIFIER_KEY, verifier);
-    sessionStorage.setItem(OAUTH_STATE_KEY, state);
-
-    const cognito = environment.auth.cognito;
-    const params = new URLSearchParams({
-      client_id: cognito.clientId,
-      response_type: 'code',
-      scope: cognito.scopes,
-      redirect_uri: cognito.redirectUri,
-      state,
-      code_challenge: challenge,
-      code_challenge_method: 'S256',
-    });
-    window.location.href = `${cognito.domain}/oauth2/authorize?${params.toString()}`;
+  loginWithAlb(): void {
+    window.location.href = apiPath('auth/login');
   }
-
-  async handleCallback(code: string, state: string): Promise<void> {
-    const expectedState = sessionStorage.getItem(OAUTH_STATE_KEY);
-    const verifier = sessionStorage.getItem(PKCE_VERIFIER_KEY);
-    sessionStorage.removeItem(OAUTH_STATE_KEY);
-    sessionStorage.removeItem(PKCE_VERIFIER_KEY);
-
-    if (!verifier || !expectedState || state !== expectedState) {
-      throw new Error('Login state mismatch; please try again.');
-    }
-
-    const cognito = environment.auth.cognito;
-    const body = new URLSearchParams({
-      grant_type: 'authorization_code',
-      client_id: cognito.clientId,
-      code,
-      redirect_uri: cognito.redirectUri,
-      code_verifier: verifier,
-    });
-
-    const response = await fetch(`${cognito.domain}/oauth2/token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body,
-    });
-    if (!response.ok) {
-      throw new Error('Token exchange with Cognito failed.');
-    }
-
-    const tokens = await response.json();
-    localStorage.setItem(ACCESS_TOKEN_KEY, tokens.access_token);
-    if (tokens.id_token) {
-      localStorage.setItem(ID_TOKEN_KEY, tokens.id_token);
-    }
-    await this.loadProfile();
-  }
-
-  // --- Session ---
 
   private profileRequest: Promise<AuthProfile> | null = null;
 
-  /**
-   * Returns the cached profile, or loads it once. Concurrent callers
-   * (e.g. authGuard and permissionGuard on the same route) share one request.
-   */
   ensureProfileLoaded(): Promise<AuthProfile> {
     const current = this.userSignal();
     if (current) {
@@ -166,67 +105,23 @@ export class AuthService {
     const profile = await firstValueFrom(
       this.http.get<AuthProfile>(apiPath('auth/me')),
     );
-    const idClaims = this.decodeIdTokenClaims();
-    const merged: AuthProfile = {
-      ...profile,
-      name: profile.name || (idClaims?.['name'] as string | undefined),
-      email: profile.email || (idClaims?.['email'] as string | undefined),
-    };
-    this.userSignal.set(merged);
-    return merged;
+    this.userSignal.set(profile);
+    return profile;
   }
 
   logout(): void {
-    this.clearSession();
-    if (environment.auth.mode === 'cognito') {
-      const cognito = environment.auth.cognito;
-      const params = new URLSearchParams({
-        client_id: cognito.clientId,
-        logout_uri: cognito.logoutUri,
-      });
-      window.location.href = `${cognito.domain}/logout?${params.toString()}`;
-    } else {
-      this.router.navigate(['/login']);
+    if (this.authMode === 'alb') {
+      this.userSignal.set(null);
+      window.location.href = apiPath('auth/logout');
+      return;
     }
+
+    this.clearSession();
+    this.router.navigate(['/login']);
   }
 
   clearSession(): void {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
-    localStorage.removeItem(ID_TOKEN_KEY);
     this.userSignal.set(null);
-  }
-
-  // --- Helpers ---
-
-  private decodeIdTokenClaims(): Record<string, unknown> | null {
-    const idToken = localStorage.getItem(ID_TOKEN_KEY);
-    if (!idToken) {
-      return null;
-    }
-    try {
-      const payload = idToken.split('.')[1];
-      const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
-      return JSON.parse(atob(normalized));
-    } catch {
-      return null;
-    }
-  }
-
-  private async generatePkce(): Promise<{ verifier: string; challenge: string }> {
-    const bytes = crypto.getRandomValues(new Uint8Array(32));
-    const verifier = this.base64Url(bytes);
-    const digest = await crypto.subtle.digest(
-      'SHA-256',
-      new TextEncoder().encode(verifier),
-    );
-    const challenge = this.base64Url(new Uint8Array(digest));
-    return { verifier, challenge };
-  }
-
-  private base64Url(bytes: Uint8Array): string {
-    return btoa(String.fromCharCode(...bytes))
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, '');
   }
 }

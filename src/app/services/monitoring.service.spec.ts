@@ -9,8 +9,9 @@ import {
   LogEvent,
   AlertEvent,
 } from './monitoring.service';
+import { apiPath } from '../core/api.constants';
 
-const BASE_URL = '/ddm/monitoring';
+const BASE_URL = apiPath('monitoring');
 
 describe('MonitoringService', () => {
   let service: MonitoringService;

@@ -2,7 +2,7 @@ import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
-import { API_VERSION, API_VERSION_HEADER, apiPath, controlPlanePath } from '../core/api.constants';
+import { API_VERSION, API_VERSION_HEADER, apiPath } from '../core/api.constants';
 import { AuthService } from '../services/auth.service';
 import { authInterceptor } from './auth.interceptor';
 
@@ -49,17 +49,38 @@ describe('authInterceptor', () => {
     request.flush({});
   });
 
-  it('handles an expired session-start request without adding Nest headers', () => {
-    http.post(controlPlanePath('sessions/start'), {}).subscribe({
-      error: () => undefined,
+  it('does not add authorization in alb mode', () => {
+    auth.authMode = 'alb';
+    auth.accessToken = null;
+
+    http.get(apiPath('auth/me')).subscribe();
+
+    const request = httpMock.expectOne(apiPath('auth/me'));
+    expect(request.request.headers.has('Authorization')).toBe(false);
+    expect(request.request.headers.get(API_VERSION_HEADER)).toBe(API_VERSION);
+    request.flush({});
+  });
+
+  it('redirects to ALB login on 401 in alb mode', () => {
+    auth.authMode = 'alb';
+    const originalLocation = window.location;
+    const locationMock = { href: '' };
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: locationMock,
     });
 
-    const request = httpMock.expectOne(controlPlanePath('sessions/start'));
-    expect(request.request.headers.has(API_VERSION_HEADER)).toBe(false);
-    expect(request.request.headers.has('Authorization')).toBe(false);
+    http.get(apiPath('auth/me')).subscribe({ error: () => undefined });
+
+    const request = httpMock.expectOne(apiPath('auth/me'));
     request.flush({}, { status: 401, statusText: 'Unauthorized' });
 
     expect(auth.clearSession).toHaveBeenCalled();
-    expect(router.navigate).toHaveBeenCalledWith(['/login']);
+    expect(locationMock.href).toBe(apiPath('auth/login'));
+
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: originalLocation,
+    });
   });
 });

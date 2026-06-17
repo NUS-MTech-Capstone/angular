@@ -2,8 +2,9 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { SessionsApiService, SessionRecord, SessionStartResponse } from './sessions.service';
+import { apiPath } from '../core/api.constants';
 
-const BASE_URL = '/ddm/sessions';
+const BASE_URL = apiPath('sessions');
 
 const mockSession = (): SessionRecord => ({
   id: 'session-1',

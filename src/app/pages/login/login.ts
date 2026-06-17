@@ -24,7 +24,6 @@ export class Login implements OnInit {
   mode = environment.auth.mode;
   devUsers: DevUserOption[] = [];
   loadingUser?: string;
-  isSsoLoading = false;
   error?: string;
 
   async ngOnInit(): Promise<void> {
@@ -58,8 +57,7 @@ export class Login implements OnInit {
     }
   }
 
-  loginWithSso(): void {
-    this.isSsoLoading = true;
-    this.auth.loginWithSso();
+  loginWithAlb(): void {
+    this.auth.loginWithAlb();
   }
 }

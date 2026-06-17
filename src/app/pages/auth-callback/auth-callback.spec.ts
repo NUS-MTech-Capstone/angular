@@ -1,41 +1,29 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute, Router } from '@angular/router';
+import { Router } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { AuthCallback } from './auth-callback';
 
 describe('AuthCallback', () => {
   let component: AuthCallback;
   let fixture: ComponentFixture<AuthCallback>;
-  let authService: { handleCallback: ReturnType<typeof vi.fn> };
+  let authService: {
+    authMode: 'dev' | 'alb';
+    ensureProfileLoaded: ReturnType<typeof vi.fn>;
+  };
   let router: { navigate: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
     authService = {
-      handleCallback: vi.fn().mockResolvedValue(undefined),
+      authMode: 'dev',
+      ensureProfileLoaded: vi.fn(),
     };
-    router = { navigate: vi.fn() };
+    router = { navigate: vi.fn().mockResolvedValue(true) };
 
     await TestBed.configureTestingModule({
       imports: [AuthCallback],
       providers: [
         { provide: AuthService, useValue: authService },
         { provide: Router, useValue: router },
-        {
-          provide: ActivatedRoute,
-          useValue: {
-            snapshot: {
-              queryParamMap: {
-                get: vi.fn((key: string) => {
-                  const params: Record<string, string> = {
-                    code: 'auth-code',
-                    state: 'oauth-state',
-                  };
-                  return params[key] ?? null;
-                }),
-              },
-            },
-          },
-        },
       ],
     }).compileComponents();
 
@@ -48,11 +36,20 @@ describe('AuthCallback', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should handle OAuth callback and navigate to access', () => {
-    expect(authService.handleCallback).toHaveBeenCalledWith(
-      'auth-code',
-      'oauth-state',
-    );
+  it('redirects to login in dev mode', () => {
+    expect(router.navigate).toHaveBeenCalledWith(['/login']);
+  });
+
+  it('redirects to access when alb profile load succeeds', async () => {
+    router.navigate.mockClear();
+    authService.authMode = 'alb';
+    authService.ensureProfileLoaded.mockResolvedValue({ username: 'alice' });
+
+    fixture = TestBed.createComponent(AuthCallback);
+    component = fixture.componentInstance;
+    await component.ngOnInit();
+
+    expect(authService.ensureProfileLoaded).toHaveBeenCalled();
     expect(router.navigate).toHaveBeenCalledWith(['/access']);
   });
 });
