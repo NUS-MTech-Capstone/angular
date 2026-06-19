@@ -14,6 +14,12 @@ does not store production bearer or PKCE tokens.
 - Session creation uses same-origin `POST /sessions/start`.
 - WebSockets connect directly to `/sessions/{sessionId}/ws`.
 
+When a production API call returns 401, the client clears its cached profile and
+navigates to the Angular `/login` page. The user explicitly starts the ALB
+authentication flow from the Login button, which prevents repeated
+`/access -> /ddm/auth/login -> /access` redirects if the ALB session is missing
+or rejected.
+
 The production environment therefore uses an empty API base URL. Development
 continues to use the local JWT flow against `http://localhost:3000`.
 

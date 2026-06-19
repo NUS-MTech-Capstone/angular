@@ -61,14 +61,8 @@ describe('authInterceptor', () => {
     request.flush({});
   });
 
-  it('redirects to ALB login on 401 in alb mode', () => {
+  it('navigates to the Angular login page on 401 in alb mode', () => {
     auth.authMode = 'alb';
-    const originalLocation = window.location;
-    const locationMock = { href: '' };
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: locationMock,
-    });
 
     http.get(apiPath('auth/me')).subscribe({ error: () => undefined });
 
@@ -76,11 +70,6 @@ describe('authInterceptor', () => {
     request.flush({}, { status: 401, statusText: 'Unauthorized' });
 
     expect(auth.clearSession).toHaveBeenCalled();
-    expect(locationMock.href).toBe(apiPath('auth/login'));
-
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: originalLocation,
-    });
+    expect(router.navigate).toHaveBeenCalledWith(['/login']);
   });
 });
