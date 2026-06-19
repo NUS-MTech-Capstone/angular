@@ -178,6 +178,9 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
       cursorBlink: this.settings.cursorBlink,
       scrollback: this.settings.scrollback,
       theme: THEMES[this.settings.theme],
+      // Disable the screen-reader textarea layer. xterm sets onfocus/onblur as
+      // HTML attributes on the accessibility element, which violates strict CSP.
+      screenReaderMode: false,
     });
     this.term.loadAddon(this.fitAddon);
     this.term.open(this.terminalHost.nativeElement);
@@ -420,7 +423,9 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
     const anchor = document.createElement('a');
     anchor.href = url;
     anchor.download = `${this.hostname}-${this.osUser}-${Date.now()}.log`;
+    document.body.appendChild(anchor);
     anchor.click();
+    document.body.removeChild(anchor);
     URL.revokeObjectURL(url);
     this.logEvent('Session log downloaded');
   }
