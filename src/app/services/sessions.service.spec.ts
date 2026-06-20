@@ -1,7 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { SessionsApiService, SessionRecord, SessionStartResponse } from './sessions.service';
+import {
+  SessionsApiService,
+  SessionRecord,
+  SessionStartResponse,
+  SessionConnectionResponse,
+  GatewayRejoinCandidate,
+} from './sessions.service';
 import { apiPath } from '../core/api.constants';
 
 const BASE_URL = apiPath('sessions');
@@ -93,22 +99,67 @@ describe('SessionsApiService', () => {
     });
   });
 
-  describe('getToken', () => {
-    it('GETs /:id/token for reconnect', () => {
-      const tokenResponse = {
+  describe('rejoin', () => {
+    it('POSTs to /:id/rejoin and returns websocket credentials', () => {
+      const rejoinResponse: SessionConnectionResponse = {
         websocketUrl: 'wss://gw/ws',
         sessionToken: 'tok',
         scopedJwt: 'jwt',
       };
-      let result: typeof tokenResponse | undefined;
+      let result: SessionConnectionResponse | undefined;
 
-      service.getToken('session-1').subscribe((r) => (result = r));
+      service.rejoin('session-1').subscribe((r) => (result = r));
 
-      const req = http.expectOne(`${BASE_URL}/session-1/token`);
+      const req = http.expectOne(`${BASE_URL}/session-1/rejoin`);
+      expect(req.request.method).toBe('POST');
+      req.flush(rejoinResponse);
+
+      expect(result).toEqual(rejoinResponse);
+    });
+  });
+
+  describe('observe', () => {
+    it('POSTs to /:id/observe and returns websocket credentials', () => {
+      const observeResponse = { websocketUrl: 'wss://gw/ws', sessionToken: 'tok' };
+      let result: typeof observeResponse | undefined;
+
+      service.observe('session-1').subscribe((r) => (result = r));
+
+      const req = http.expectOne(`${BASE_URL}/session-1/observe`);
+      expect(req.request.method).toBe('POST');
+      req.flush(observeResponse);
+
+      expect(result).toEqual(observeResponse);
+    });
+  });
+
+  describe('rejoinCandidates', () => {
+    it('GETs /rejoin-candidates with hostId', () => {
+      const candidates: GatewayRejoinCandidate[] = [
+        { sessionId: 'gw-1', hostId: 'host-1' },
+      ];
+      let result: GatewayRejoinCandidate[] | undefined;
+
+      service.rejoinCandidates('host-1').subscribe((r) => (result = r));
+
+      const req = http.expectOne(
+        (r) => r.url === `${BASE_URL}/rejoin-candidates`,
+      );
       expect(req.request.method).toBe('GET');
-      req.flush(tokenResponse);
+      expect(req.request.params.get('hostId')).toBe('host-1');
+      req.flush(candidates);
 
-      expect(result).toEqual(tokenResponse);
+      expect(result?.length).toBe(1);
+    });
+
+    it('GETs /rejoin-candidates with hostId and crId', () => {
+      service.rejoinCandidates('host-1', 'cr-1').subscribe();
+
+      const req = http.expectOne(
+        (r) => r.url === `${BASE_URL}/rejoin-candidates`,
+      );
+      expect(req.request.params.get('crId')).toBe('cr-1');
+      req.flush([]);
     });
   });
 

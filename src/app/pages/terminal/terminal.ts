@@ -215,16 +215,18 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
     this.logEvent(`Session requested as ${this.osUser}@${this.ip} (${this.crNumber})`);
 
     if (this.reconnectSessionId) {
-      // UC: Reconnect Session — use stored gateway credentials for this session
+      // UC: Reconnect Session — ask the gateway for a fresh WebSocket ticket
+      // via POST /sessions/{id}/rejoin (gateway spec).
       this.http
-        .get<{ websocketUrl: string; sessionToken: string }>(
-          apiPath(`sessions/${this.reconnectSessionId}/token`),
+        .post<{ websocketUrl: string; sessionToken: string }>(
+          apiPath(`sessions/${this.reconnectSessionId}/rejoin`),
+          {},
         )
         .subscribe({
           next: (session) => this.openWebSocket(session.websocketUrl, session.sessionToken),
           error: () => {
-            // Gateway session may have expired; fall back to starting a fresh one
-            this.logEvent('Reconnect failed — starting new session');
+            // Gateway session no longer rejoinable; start a fresh one
+            this.logEvent('Rejoin failed — starting new session');
             this.reconnectSessionId = '';
             this.startNewSession();
           },
@@ -241,6 +243,8 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
         {
           hostId: this.hostId,
           crId: this.crId,
+          // osUser is kept for audit logging in the platform DB but is NOT
+          // forwarded to the gateway (per gateway API spec).
           osUser: this.osUser,
           connectionType: 'ssh',
         },
