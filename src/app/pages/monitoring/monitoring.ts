@@ -130,6 +130,14 @@ export class Monitoring implements OnInit, OnDestroy {
 
   // ── Alarms & Alerts ──────────────────────────────────────────────────────
 
+  private refreshAuthorizationStatus(): void {
+    this.monitoring.getStatus().subscribe({
+      next: (s) => {
+        this.status = s;
+      },
+    });
+  }
+
   loadAlarms(): void {
     if (!this.can('monitoring.view')) return;
     this.isLoadingAlarms = true;
@@ -137,9 +145,11 @@ export class Monitoring implements OnInit, OnDestroy {
       next: (data) => {
         this.alarms = data;
         this.isLoadingAlarms = false;
+        this.refreshAuthorizationStatus();
       },
       error: (err) => {
         this.isLoadingAlarms = false;
+        this.refreshAuthorizationStatus();
         this.message.error(`Failed to load alarms: ${err?.message ?? 'Unknown error'}`);
       },
     });
@@ -190,11 +200,17 @@ export class Monitoring implements OnInit, OnDestroy {
         next: (data) => {
           this.metricSummaries.push({ ...data, label: pm.label, icon: pm.icon });
           pending--;
-          if (pending === 0) this.isLoadingMetrics = false;
+          if (pending === 0) {
+            this.isLoadingMetrics = false;
+            this.refreshAuthorizationStatus();
+          }
         },
         error: () => {
           pending--;
-          if (pending === 0) this.isLoadingMetrics = false;
+          if (pending === 0) {
+            this.isLoadingMetrics = false;
+            this.refreshAuthorizationStatus();
+          }
         },
       });
     });

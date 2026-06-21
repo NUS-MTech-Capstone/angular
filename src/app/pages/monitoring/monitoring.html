@@ -6,9 +6,13 @@
         <span nz-icon nzType="dashboard" nzTheme="outline"></span>
         Monitoring &amp; Observability
       </h2>
-      <nz-tag *ngIf="status.configured" nzColor="green">
+      <nz-tag *ngIf="status.configured && status.awsAuthorized !== false" nzColor="green">
         <span nz-icon nzType="check-circle" nzTheme="outline"></span>
         AWS CloudWatch · {{ status.region }}
+      </nz-tag>
+      <nz-tag *ngIf="status.configured && status.awsAuthorized === false" nzColor="red">
+        <span nz-icon nzType="close-circle" nzTheme="outline"></span>
+        CloudWatch access denied
       </nz-tag>
       <nz-tag *ngIf="!status.configured" nzColor="orange">
         <span nz-icon nzType="warning" nzTheme="outline"></span>
@@ -30,6 +34,16 @@
     nzShowIcon
     nzMessage="CloudWatch integration is not configured"
     nzDescription="Set CLOUDWATCH_REGION in your environment to enable live metrics, alarms, and log streaming from AWS CloudWatch."
+    style="margin-bottom: 16px;">
+  </nz-alert>
+
+  <!-- IAM permissions banner -->
+  <nz-alert
+    *ngIf="status.configured && status.awsAuthorized === false"
+    nzType="warning"
+    nzShowIcon
+    nzMessage="CloudWatch access denied"
+    [nzDescription]="status.authorizationHint || 'The nest-backend IAM role needs CloudWatch Logs and Metrics read permissions.'"
     style="margin-bottom: 16px;">
   </nz-alert>
 

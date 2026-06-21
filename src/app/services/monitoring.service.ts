@@ -8,6 +8,8 @@ export interface MonitoringStatus {
   region?: string;
   logGroup?: string;
   sessionLogGroup?: string;
+  awsAuthorized?: boolean;
+  authorizationHint?: string;
 }
 
 export interface AlarmSummary {
