@@ -29,15 +29,11 @@
           <i nz-icon nzType="sync"></i>
           Sync from cloud
         </button>
-        <button *nzSpaceItem nz-button nzType="primary" nzGhost (click)="openAdminCreateModal()">
-          <i nz-icon nzType="plus-circle"></i>
-          Add server
-        </button>
       </ng-container>
       <ng-container *ngIf="can('inventory.request')">
         <button *nzSpaceItem nz-button nzType="primary" (click)="openAddModal()">
           <i nz-icon nzType="plus"></i>
-          Request new server
+          Add server
         </button>
       </ng-container>
     </nz-space>
@@ -243,7 +239,7 @@
 
 <nz-modal
   [(nzVisible)]="isModalOpen"
-  [nzTitle]="editingVmId ? 'Request server update' : 'Request new server'"
+  [nzTitle]="editingVmId ? 'Request server update' : 'Add server'"
   nzCentered
   nzWidth="600px"
   [nzOkText]="'Submit for approval'"
@@ -430,13 +426,13 @@
   </ng-container>
 </nz-drawer>
 
-<!-- ── Admin direct create / edit modal (UC-2, UC-3) ───────── -->
+<!-- ── Admin direct edit modal ───────────────────────────────── -->
 <nz-modal
   [(nzVisible)]="isAdminModalOpen"
-  [nzTitle]="adminEditingVmId ? 'Edit server' : 'Register server'"
+  nzTitle="Edit server"
   nzCentered
   nzWidth="560px"
-  [nzOkText]="adminEditingVmId ? 'Save changes' : 'Register'"
+  nzOkText="Save changes"
   nzCancelText="Cancel"
   [nzOkLoading]="isAdminSubmitting"
   [nzCancelDisabled]="isAdminSubmitting"

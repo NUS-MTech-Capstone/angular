@@ -365,13 +365,7 @@ export class Inventory implements OnInit {
     this.isDetailDrawerOpen = true;
   }
 
-  // ── Admin direct create / update ─────────────────────────────
-  openAdminCreateModal(): void {
-    this.adminEditingVmId = undefined;
-    this.adminVmForm.reset({ hostname: null, ipAddress: null, assetStatus: 'Active', osVersion: null, sshPort: 22 });
-    this.isAdminModalOpen = true;
-  }
-
+  // ── Admin direct edit ────────────────────────────────────────
   openAdminEditModal(vm: VirtualMachine): void {
     this.adminEditingVmId = vm.id;
     this.adminVmForm.setValue({
@@ -391,14 +385,13 @@ export class Inventory implements OnInit {
     }
     this.isAdminSubmitting = true;
     const v = this.adminVmForm.value;
-    const action$ = this.adminEditingVmId
-      ? this.inventoryService.adminUpdate(this.adminEditingVmId, v)
-      : this.inventoryService.adminCreate(v);
+    if (!this.adminEditingVmId) {
+      return;
+    }
 
-    action$.subscribe({
+    this.inventoryService.adminUpdate(this.adminEditingVmId, v).subscribe({
       next: (vm) => {
-        const label = this.adminEditingVmId ? 'updated' : 'registered';
-        this.message.success(`${vm.hostname} ${label}`);
+        this.message.success(`${vm.hostname} updated`);
         this.isAdminSubmitting = false;
         this.isAdminModalOpen = false;
         this.loadVirtualMachines();
