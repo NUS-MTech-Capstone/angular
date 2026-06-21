@@ -49,9 +49,10 @@ describe('SessionsApiService', () => {
     it('POSTs to /start with payload and returns session response', () => {
       const payload = { hostId: 'host-1', crId: 'cr-1', osUser: 'root' };
       const response: SessionStartResponse = {
-        websocketUrl: 'wss://gw/ws',
-        sessionToken: 'tok',
         sessionId: 'session-1',
+        sessionToken: 'tok',
+        websocketUrl: 'wss://gw/ws',
+        expiresAt: '2026-06-21T10:00:00.000Z',
         scopedJwt: 'jwt',
       };
       let result: SessionStartResponse | undefined;
@@ -102,8 +103,10 @@ describe('SessionsApiService', () => {
   describe('rejoin', () => {
     it('POSTs to /:id/rejoin and returns websocket credentials', () => {
       const rejoinResponse: SessionConnectionResponse = {
-        websocketUrl: 'wss://gw/ws',
+        sessionId: 'session-1',
         sessionToken: 'tok',
+        websocketUrl: 'wss://gw/ws',
+        expiresAt: '2026-06-21T10:00:00.000Z',
         scopedJwt: 'jwt',
       };
       let result: SessionConnectionResponse | undefined;
@@ -120,8 +123,14 @@ describe('SessionsApiService', () => {
 
   describe('observe', () => {
     it('POSTs to /:id/observe and returns websocket credentials', () => {
-      const observeResponse = { websocketUrl: 'wss://gw/ws', sessionToken: 'tok' };
-      let result: typeof observeResponse | undefined;
+      const observeResponse: SessionConnectionResponse = {
+        sessionId: 'session-1',
+        sessionToken: 'tok',
+        websocketUrl: 'wss://gw/ws',
+        expiresAt: '2026-06-21T10:00:00.000Z',
+        scopedJwt: 'jwt',
+      };
+      let result: SessionConnectionResponse | undefined;
 
       service.observe('session-1').subscribe((r) => (result = r));
 
@@ -134,11 +143,20 @@ describe('SessionsApiService', () => {
   });
 
   describe('rejoinCandidates', () => {
-    it('GETs /rejoin-candidates with hostId', () => {
-      const candidates: GatewayRejoinCandidate[] = [
-        { sessionId: 'gw-1', hostId: 'host-1' },
-      ];
-      let result: GatewayRejoinCandidate[] | undefined;
+    const mockCandidate = (): GatewayRejoinCandidate => ({
+      sessionId: 'gw-1',
+      hostId: 'host-1',
+      crId: 'cr-1',
+      connectionType: 'ssh',
+      status: 'active',
+      createdAt: '2026-06-21T00:00:00.000Z',
+      lastHeartbeatAt: '2026-06-21T00:01:00.000Z',
+      leaseExpiresAt: '2026-06-21T01:00:00.000Z',
+    });
+
+    it('GETs /rejoin-candidates with hostId and returns {sessions} wrapper', () => {
+      const response = { sessions: [mockCandidate()] };
+      let result: { sessions: GatewayRejoinCandidate[] } | undefined;
 
       service.rejoinCandidates('host-1').subscribe((r) => (result = r));
 
@@ -147,9 +165,10 @@ describe('SessionsApiService', () => {
       );
       expect(req.request.method).toBe('GET');
       expect(req.request.params.get('hostId')).toBe('host-1');
-      req.flush(candidates);
+      req.flush(response);
 
-      expect(result?.length).toBe(1);
+      expect(result?.sessions.length).toBe(1);
+      expect(result?.sessions[0].sessionId).toBe('gw-1');
     });
 
     it('GETs /rejoin-candidates with hostId and crId', () => {
@@ -159,7 +178,7 @@ describe('SessionsApiService', () => {
         (r) => r.url === `${BASE_URL}/rejoin-candidates`,
       );
       expect(req.request.params.get('crId')).toBe('cr-1');
-      req.flush([]);
+      req.flush({ sessions: [] });
     });
   });
 

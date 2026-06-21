@@ -22,24 +22,32 @@ export interface SessionRecord {
 }
 
 export interface SessionStartResponse {
-  websocketUrl: string;
-  sessionToken: string;
+  /** DDM internal session ID (use for all subsequent DDM API calls) */
   sessionId: string;
+  sessionToken: string;
+  websocketUrl: string;
+  expiresAt: string;
   scopedJwt: string;
 }
 
 export interface SessionConnectionResponse {
-  websocketUrl: string;
+  sessionId: string;
   sessionToken: string;
+  websocketUrl: string;
+  expiresAt: string;
   scopedJwt: string;
 }
 
+/** Matches the gateway spec's SessionCandidate schema. */
 export interface GatewayRejoinCandidate {
   sessionId: string;
   hostId: string;
-  crId?: string;
-  createdAt?: string;
-  [key: string]: unknown;
+  crId: string;
+  connectionType: string;
+  status: string;
+  createdAt: string;
+  lastHeartbeatAt: string;
+  leaseExpiresAt: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -56,11 +64,12 @@ export class SessionsApiService {
     return this.http.post<SessionStartResponse>(`${this.base}/start`, payload);
   }
 
-  /** Ask the gateway which sessions can be rejoined for the given host/CR. */
-  rejoinCandidates(hostId: string, crId?: string): Observable<GatewayRejoinCandidate[]> {
+  /** Ask the gateway which sessions can be rejoined for the given host/CR.
+   *  Gateway returns { sessions: SessionCandidate[] } per spec. */
+  rejoinCandidates(hostId: string, crId?: string): Observable<{ sessions: GatewayRejoinCandidate[] }> {
     const params: Record<string, string> = { hostId };
     if (crId) params['crId'] = crId;
-    return this.http.get<GatewayRejoinCandidate[]>(`${this.base}/rejoin-candidates`, { params });
+    return this.http.get<{ sessions: GatewayRejoinCandidate[] }>(`${this.base}/rejoin-candidates`, { params });
   }
 
   /** Rejoin an existing session — gateway issues a fresh WebSocket ticket. */
@@ -69,11 +78,8 @@ export class SessionsApiService {
   }
 
   /** Get a read-only observe ticket for watching an active session. */
-  observe(id: string): Observable<{ websocketUrl: string; sessionToken: string }> {
-    return this.http.post<{ websocketUrl: string; sessionToken: string }>(
-      `${this.base}/${id}/observe`,
-      {},
-    );
+  observe(id: string): Observable<SessionConnectionResponse> {
+    return this.http.post<SessionConnectionResponse>(`${this.base}/${id}/observe`, {});
   }
 
   listActive(hostId?: string): Observable<SessionRecord[]> {
