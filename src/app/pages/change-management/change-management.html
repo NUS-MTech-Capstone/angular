@@ -110,7 +110,7 @@
         <nz-form-item>
           <nz-form-label [nzSpan]="24" nzRequired>Approval route</nz-form-label>
           <nz-form-control [nzSpan]="24">
-            <nz-select formControlName="approvalRoute" [nzDisabled]="isSubmitting">
+            <nz-select formControlName="approvalRoute">
               <nz-option nzValue="Normal" nzLabel="Normal review" />
               <nz-option nzValue="Fast track" nzLabel="Fast track" />
               <nz-option nzValue="Security review" nzLabel="Security review" />
@@ -130,7 +130,6 @@
               nzFormat="yyyy-MM-dd HH:mm"
               nzPlaceHolder="Select start date and time"
               [nzDisabledDate]="disabledDate"
-              [nzDisabled]="isSubmitting"
               style="width: 100%;">
             </nz-date-picker>
             <ng-template #implementationStartError>
@@ -156,7 +155,6 @@
               nzFormat="yyyy-MM-dd HH:mm"
               nzPlaceHolder="Select end date and time"
               [nzDisabledDate]="disabledDate"
-              [nzDisabled]="isSubmitting"
               style="width: 100%;">
             </nz-date-picker>
             <ng-template #implementationEndError>
@@ -176,8 +174,7 @@
             <nz-select
               formControlName="activities"
               nzMode="tags"
-              nzPlaceHolder="e.g. Patch OS, Restart nginx, Rotate certificates"
-              [nzDisabled]="isSubmitting">
+              nzPlaceHolder="e.g. Patch OS, Restart nginx, Rotate certificates">
             </nz-select>
           </nz-form-control>
         </nz-form-item>
@@ -188,8 +185,7 @@
             <nz-select
               formControlName="vmIds"
               nzMode="multiple"
-              nzPlaceHolder="Select VMs from inventory"
-              [nzDisabled]="isSubmitting">
+              nzPlaceHolder="Select VMs from inventory">
               <nz-option *ngFor="let vm of vms" [nzValue]="vm.id" [nzLabel]="vmLabel(vm)" />
             </nz-select>
           </nz-form-control>
@@ -201,8 +197,7 @@
             <nz-select
               formControlName="implementerGroupIds"
               nzMode="multiple"
-              nzPlaceHolder="Select implementer groups"
-              [nzDisabled]="isSubmitting">
+              nzPlaceHolder="Select implementer groups">
               <nz-option
                 *ngFor="let group of implementerGroups"
                 [nzValue]="group.id"
@@ -217,8 +212,7 @@
             <nz-select
               formControlName="allowedRoles"
               nzMode="multiple"
-              nzPlaceHolder="Select access roles"
-              [nzDisabled]="isSubmitting">
+              nzPlaceHolder="Select access roles">
               <nz-option *ngFor="let role of roleOptions" [nzValue]="role" [nzLabel]="role" />
             </nz-select>
           </nz-form-control>

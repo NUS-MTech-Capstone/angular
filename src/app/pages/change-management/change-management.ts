@@ -154,9 +154,20 @@ export class ChangeManagement implements OnInit {
     return 'New change request';
   }
 
+  private setFormSubmitting(submitting: boolean): void {
+    this.isSubmitting = submitting;
+    if (submitting) {
+      this.changeForm.disable({ emitEvent: false });
+    } else {
+      this.changeForm.enable({ emitEvent: false });
+    }
+    this.cd.detectChanges();
+  }
+
   openCreateModal(): void {
     this.editingRequestId = undefined;
     this.cloningFromCrNumber = undefined;
+    this.setFormSubmitting(false);
     this.changeForm.reset({
       approvalRoute: 'Normal',
       implementationStartAt: null,
@@ -173,6 +184,7 @@ export class ChangeManagement implements OnInit {
   cloneRequest(source: ChangeRequest): void {
     this.editingRequestId = undefined;
     this.cloningFromCrNumber = this.crNumber(source);
+    this.setFormSubmitting(false);
     this.changeForm.reset({
       title: source.title,
       description: source.description,
@@ -272,8 +284,8 @@ export class ChangeManagement implements OnInit {
       return;
     }
 
-    this.isSubmitting = true;
-    const raw = this.changeForm.value;
+    this.setFormSubmitting(true);
+    const raw = this.changeForm.getRawValue();
     const formValue = {
       ...raw,
       implementationStartAt: this.toIso(raw.implementationStartAt),
@@ -283,27 +295,25 @@ export class ChangeManagement implements OnInit {
     if (this.editingRequestId != null) {
       this.changeRequestService.update(this.editingRequestId, formValue).subscribe({
         next: () => {
-          this.isSubmitting = false;
           this.message.success('Change request updated');
           this.loadChangeRequests();
           this.resetForm();
         },
         error: (err) => {
           this.message.error(err?.error?.message ?? 'Update failed');
-          this.isSubmitting = false;
+          this.setFormSubmitting(false);
         },
       });
     } else {
       this.changeRequestService.create(formValue).subscribe({
         next: () => {
-          this.isSubmitting = false;
           this.message.success('Change request created');
           this.loadChangeRequests();
           this.resetForm();
         },
         error: (err) => {
           this.message.error(err?.error?.message ?? 'Create failed');
-          this.isSubmitting = false;
+          this.setFormSubmitting(false);
         },
       });
     }
@@ -314,7 +324,7 @@ export class ChangeManagement implements OnInit {
     this.cloningFromCrNumber = undefined;
     this.selectedRequest = undefined;
     this.isModalOpen = false;
-    this.isSubmitting = false;
+    this.setFormSubmitting(false);
     this.changeForm.reset({
       approvalRoute: 'Normal',
       implementationStartAt: null,
@@ -333,6 +343,7 @@ export class ChangeManagement implements OnInit {
 
     this.editingRequestId = request.id;
     this.cloningFromCrNumber = undefined;
+    this.setFormSubmitting(false);
     this.changeForm.setValue({
       title: request.title,
       description: request.description,
