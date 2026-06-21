@@ -83,7 +83,7 @@ export class ChangeManagement implements OnInit {
   readonly disabledDate = (current: Date): boolean =>
     current < new Date(new Date().setHours(0, 0, 0, 0));
 
-  /** Reactive form validator: scheduled date must be now or in the future. */
+  /** Reactive form validator: start datetime must be now or in the future. */
   readonly futureDateValidator = (control: import('@angular/forms').AbstractControl) => {
     const value: Date | null = control.value;
     if (!value) return null;
@@ -91,6 +91,25 @@ export class ChangeManagement implements OnInit {
     now.setSeconds(0, 0);
     return value < now ? { pastDate: true } : null;
   };
+
+  /** Ensures implementation end is after start. */
+  readonly implementationWindowValidator = (
+    group: import('@angular/forms').AbstractControl,
+  ) => {
+    const start = group.get('implementationStartAt')?.value as Date | null;
+    const end = group.get('implementationEndAt')?.value as Date | null;
+    if (!start || !end) {
+      return null;
+    }
+    return end <= start ? { invalidRange: true } : null;
+  };
+
+  private toIso(value: Date | string | null | undefined): string | undefined {
+    if (value instanceof Date) {
+      return value.toISOString();
+    }
+    return value ?? undefined;
+  }
 
   constructor(
     private fb: FormBuilder,
@@ -101,17 +120,21 @@ export class ChangeManagement implements OnInit {
     private auth: AuthService,
     private message: NzMessageService,
   ) {
-    this.changeForm = this.fb.group({
-      title: [null as string | null, [Validators.required]],
-      description: [null as string | null, [Validators.required]],
-      approvalRoute: ['Normal', [Validators.required]],
-      scheduledDate: [null as Date | null, [this.futureDateValidator]],
-      comments: [null as string | null],
-      activities: [[] as string[]],
-      vmIds: [[] as string[]],
-      implementerGroupIds: [[] as string[]],
-      allowedRoles: [[] as string[]],
-    });
+    this.changeForm = this.fb.group(
+      {
+        title: [null as string | null, [Validators.required]],
+        description: [null as string | null, [Validators.required]],
+        approvalRoute: ['Normal', [Validators.required]],
+        implementationStartAt: [null as Date | null, [Validators.required, this.futureDateValidator]],
+        implementationEndAt: [null as Date | null, [Validators.required]],
+        comments: [null as string | null],
+        activities: [[] as string[]],
+        vmIds: [[] as string[]],
+        implementerGroupIds: [[] as string[]],
+        allowedRoles: [[] as string[]],
+      },
+      { validators: this.implementationWindowValidator },
+    );
   }
 
   ngOnInit(): void {
@@ -136,7 +159,8 @@ export class ChangeManagement implements OnInit {
     this.cloningFromCrNumber = undefined;
     this.changeForm.reset({
       approvalRoute: 'Normal',
-      scheduledDate: null,
+      implementationStartAt: null,
+      implementationEndAt: null,
       activities: [],
       vmIds: [],
       implementerGroupIds: [],
@@ -153,7 +177,8 @@ export class ChangeManagement implements OnInit {
       title: source.title,
       description: source.description,
       approvalRoute: source.approvalRoute,
-      scheduledDate: null,
+      implementationStartAt: null,
+      implementationEndAt: null,
       comments: source.comments || null,
       activities: [...(source.activities ?? [])],
       vmIds: [...(source.vmIds ?? [])],
@@ -251,9 +276,8 @@ export class ChangeManagement implements OnInit {
     const raw = this.changeForm.value;
     const formValue = {
       ...raw,
-      scheduledDate: raw.scheduledDate instanceof Date
-        ? raw.scheduledDate.toISOString()
-        : raw.scheduledDate ?? undefined,
+      implementationStartAt: this.toIso(raw.implementationStartAt),
+      implementationEndAt: this.toIso(raw.implementationEndAt),
     };
 
     if (this.editingRequestId != null) {
@@ -293,7 +317,8 @@ export class ChangeManagement implements OnInit {
     this.isSubmitting = false;
     this.changeForm.reset({
       approvalRoute: 'Normal',
-      scheduledDate: null,
+      implementationStartAt: null,
+      implementationEndAt: null,
       activities: [],
       vmIds: [],
       implementerGroupIds: [],
@@ -312,7 +337,12 @@ export class ChangeManagement implements OnInit {
       title: request.title,
       description: request.description,
       approvalRoute: request.approvalRoute,
-      scheduledDate: request.scheduledDate ? new Date(request.scheduledDate) : null,
+      implementationStartAt: request.implementationStartAt
+        ? new Date(request.implementationStartAt)
+        : null,
+      implementationEndAt: request.implementationEndAt
+        ? new Date(request.implementationEndAt)
+        : null,
       comments: request.comments || '',
       activities: request.activities || [],
       vmIds: request.vmIds || [],

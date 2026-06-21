@@ -18,6 +18,8 @@ const mockCr = (): ChangeRequest => ({
   vmIds: [],
   allowedRoles: [],
   implementerGroupIds: [],
+  implementationStartAt: '2026-06-22T00:00:00.000Z',
+  implementationEndAt: '2026-06-23T00:00:00.000Z',
 });
 
 describe('ChangeRequestService', () => {
@@ -83,6 +85,8 @@ describe('ChangeRequestService', () => {
         title: 'Deploy patch',
         description: 'Apply patches',
         approvalRoute: 'Normal',
+        implementationStartAt: '2026-06-22T00:00:00.000Z',
+        implementationEndAt: '2026-06-23T00:00:00.000Z',
       };
       let result: ChangeRequest | undefined;
 

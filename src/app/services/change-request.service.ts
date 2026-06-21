@@ -27,7 +27,8 @@ export interface ChangeRequest {
   vmIds: string[];
   allowedRoles: string[];
   implementerGroupIds: string[];
-  scheduledDate?: string;
+  implementationStartAt: string;
+  implementationEndAt: string;
 }
 
 /** A change request as served to the Access tab, with its VMs and implementer groups resolved. */
@@ -46,7 +47,8 @@ export interface CreateChangeRequestDto {
   vmIds?: string[];
   allowedRoles?: string[];
   implementerGroupIds?: string[];
-  scheduledDate?: string;
+  implementationStartAt: string;
+  implementationEndAt: string;
 }
 
 export interface UpdateChangeRequestDto {
@@ -58,7 +60,8 @@ export interface UpdateChangeRequestDto {
   vmIds?: string[];
   allowedRoles?: string[];
   implementerGroupIds?: string[];
-  scheduledDate?: string;
+  implementationStartAt?: string;
+  implementationEndAt?: string;
 }
 
 export const ChangeRequestModel = [
@@ -69,7 +72,8 @@ export const ChangeRequestModel = [
   {id: 'approvalRoute', display: 'Approval Route', type: 'default'},
   {id: 'status', display: 'Status', type: 'status'},
   {id: 'createdAt', display: 'Created At', type: 'date'},
-  {id: 'scheduledDate', display: 'Scheduled Date', type: 'date'},
+  {id: 'implementationStartAt', display: 'Implementation Start', type: 'date'},
+  {id: 'implementationEndAt', display: 'Implementation End', type: 'date'},
   {id: 'approver', display: 'Approver', type: 'default'},
   {id: 'comments', display: 'Comments', type: 'default'},
 ];

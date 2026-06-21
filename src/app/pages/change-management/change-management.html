@@ -119,22 +119,53 @@
         </nz-form-item>
 
         <nz-form-item>
-          <nz-form-label [nzSpan]="24">Scheduled implementation date</nz-form-label>
+          <nz-form-label [nzSpan]="24" nzRequired>Implementation start</nz-form-label>
           <nz-form-control
             [nzSpan]="24"
-            nzExtra="Optional planned date. Cannot be set in the past."
-            [nzErrorTip]="scheduledDateError">
+            nzExtra="When work is planned to begin. Cannot be in the past."
+            [nzErrorTip]="implementationStartError">
             <nz-date-picker
-              formControlName="scheduledDate"
+              formControlName="implementationStartAt"
               nzShowTime
               nzFormat="yyyy-MM-dd HH:mm"
-              nzPlaceHolder="Select date and time"
+              nzPlaceHolder="Select start date and time"
               [nzDisabledDate]="disabledDate"
               [nzDisabled]="isSubmitting"
               style="width: 100%;">
             </nz-date-picker>
-            <ng-template #scheduledDateError>
-              Scheduled date cannot be in the past
+            <ng-template #implementationStartError>
+              <ng-container *ngIf="changeForm.get('implementationStartAt')?.hasError('required')">
+                Please select an implementation start time
+              </ng-container>
+              <ng-container *ngIf="changeForm.get('implementationStartAt')?.hasError('pastDate')">
+                Start time cannot be in the past
+              </ng-container>
+            </ng-template>
+          </nz-form-control>
+        </nz-form-item>
+
+        <nz-form-item>
+          <nz-form-label [nzSpan]="24" nzRequired>Implementation end</nz-form-label>
+          <nz-form-control
+            [nzSpan]="24"
+            nzExtra="When work is planned to finish. Must be after the start time."
+            [nzErrorTip]="implementationEndError">
+            <nz-date-picker
+              formControlName="implementationEndAt"
+              nzShowTime
+              nzFormat="yyyy-MM-dd HH:mm"
+              nzPlaceHolder="Select end date and time"
+              [nzDisabledDate]="disabledDate"
+              [nzDisabled]="isSubmitting"
+              style="width: 100%;">
+            </nz-date-picker>
+            <ng-template #implementationEndError>
+              <ng-container *ngIf="changeForm.get('implementationEndAt')?.hasError('required')">
+                Please select an implementation end time
+              </ng-container>
+              <ng-container *ngIf="changeForm.hasError('invalidRange')">
+                End time must be after the start time
+              </ng-container>
             </ng-template>
           </nz-form-control>
         </nz-form-item>
