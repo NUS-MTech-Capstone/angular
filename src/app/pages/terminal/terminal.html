@@ -7,10 +7,10 @@
       <span class="session-state">{{ connected ? 'Connected' : 'Disconnected' }}</span>
     </div>
     <div class="toolbar-actions">
-      <button nz-button nzType="text" class="toolbar-btn" nz-tooltip="Copy all to clipboard" (click)="copyAll()">
+      <button nz-button nzType="text" class="toolbar-btn" nz-tooltip="Copy selection (Ctrl+Shift+C)" (click)="copy()">
         <span nz-icon nzType="copy"></span>
       </button>
-      <button nz-button nzType="text" class="toolbar-btn" nz-tooltip="Paste" (click)="pasteFromClipboard()">
+      <button nz-button nzType="text" class="toolbar-btn" nz-tooltip="Paste (right-click or Ctrl+Shift+V)" (click)="pasteFromClipboard()">
         <span nz-icon nzType="snippets"></span>
       </button>
       <button nz-button nzType="text" class="toolbar-btn" nz-tooltip="Clear scrollback" (click)="clearScrollback()">
@@ -109,10 +109,12 @@
         <span class="setting-label">Copy on select</span>
         <nz-switch [(ngModel)]="settings.copyOnSelect" (ngModelChange)="applySettings()"></nz-switch>
       </div>
+      <p class="setting-hint">PuTTY-style: drag to highlight, release to copy. Shift+right-click copies selection.</p>
       <div class="setting-row">
         <span class="setting-label">Right-click paste</span>
         <nz-switch [(ngModel)]="settings.rightClickPaste" (ngModelChange)="applySettings()"></nz-switch>
       </div>
+      <p class="setting-hint">Ctrl+Shift+C copy · Ctrl+Shift+V paste · middle-click paste</p>
     </div>
 
     <button nz-button nzBlock (click)="restoreDefaultSettings()">Restore defaults</button>

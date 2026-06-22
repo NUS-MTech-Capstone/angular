@@ -59,40 +59,52 @@ const DEFAULT_SETTINGS: TerminalSettings = {
   cursorBlink: true,
   scrollback: 2000,
   visualBell: true,
-  copyOnSelect: false,
+  copyOnSelect: true,
   rightClickPaste: true,
 };
+
+const PUTTY_SELECTION = {
+  selectionBackground: '#316ac5',
+  selectionForeground: '#ffffff',
+  selectionInactiveBackground: 'rgba(49, 106, 197, 0.45)',
+} as const;
 
 const THEMES: Record<string, ITheme> = {
   'Dark Slate': {
     background: '#373e4d',
     foreground: '#e8eaf0',
     cursor: '#ffffff',
-    selectionBackground: 'rgba(255, 255, 255, 0.3)',
+    ...PUTTY_SELECTION,
   },
   'PuTTY Classic': {
     background: '#000000',
     foreground: '#bbbbbb',
     cursor: '#00ff00',
-    selectionBackground: 'rgba(255, 255, 255, 0.3)',
+    ...PUTTY_SELECTION,
   },
   'Light': {
     background: '#ffffff',
     foreground: '#1f1f1f',
     cursor: '#1f1f1f',
-    selectionBackground: 'rgba(0, 0, 0, 0.2)',
+    selectionBackground: '#0078d7',
+    selectionForeground: '#ffffff',
+    selectionInactiveBackground: 'rgba(0, 120, 215, 0.35)',
   },
   'Green Phosphor': {
     background: '#001100',
     foreground: '#00cc66',
     cursor: '#00ff88',
-    selectionBackground: 'rgba(0, 255, 136, 0.3)',
+    selectionBackground: '#006622',
+    selectionForeground: '#ccffcc',
+    selectionInactiveBackground: 'rgba(0, 102, 34, 0.45)',
   },
   'Solarized Dark': {
     background: '#002b36',
     foreground: '#839496',
     cursor: '#93a1a1',
-    selectionBackground: 'rgba(147, 161, 161, 0.3)',
+    selectionBackground: '#094959',
+    selectionForeground: '#fdf6e3',
+    selectionInactiveBackground: 'rgba(9, 73, 89, 0.55)',
   },
 };
 
@@ -149,6 +161,8 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
   private ws: WebSocket | null = null;
   private encoder = new TextEncoder();
   private sessionLog: string[] = [];
+  private terminalMouseUpHandler = (event: MouseEvent) => this.onTerminalMouseUp(event);
+  private terminalAuxClickHandler = (event: MouseEvent) => this.onTerminalAuxClick(event);
   private resizeHandler = () => {
     this.fitAddon.fit();
     this.sendResize();
@@ -190,13 +204,13 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
     this.fitAddon.fit();
     window.addEventListener('resize', this.resizeHandler);
 
+    const host = this.terminalHost.nativeElement;
+    host.addEventListener('mouseup', this.terminalMouseUpHandler);
+    host.addEventListener('auxclick', this.terminalAuxClickHandler);
+
     this.term.onData((data) => this.sendInput(data));
     this.term.onBell(() => this.ringBell());
-    this.term.onSelectionChange(() => {
-      if (this.settings.copyOnSelect && this.term.hasSelection()) {
-        navigator.clipboard.writeText(this.term.getSelection()).catch(() => {});
-      }
-    });
+    this.term.attachCustomKeyEventHandler((event) => this.handleTerminalKeyEvent(event));
 
     this.connect();
     this.term.focus();
@@ -205,6 +219,8 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
 
   ngOnDestroy(): void {
     window.removeEventListener('resize', this.resizeHandler);
+    this.terminalHost?.nativeElement.removeEventListener('mouseup', this.terminalMouseUpHandler);
+    this.terminalHost?.nativeElement.removeEventListener('auxclick', this.terminalAuxClickHandler);
     this.ws?.close();
     this.term?.dispose();
   }
@@ -388,14 +404,29 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
     }, 150);
   }
 
-  // --- PuTTY-style window actions ---
+  // --- PuTTY-style selection, copy, and paste ---
+
+  /** Copy selection if present; otherwise copy the full scrollback. */
+  copy(): void {
+    if (this.term.hasSelection()) {
+      this.copySelection(false);
+      return;
+    }
+    this.copyAll();
+  }
+
+  copySelection(clearAfter = false): void {
+    const text = this.term.getSelection();
+    if (!text) {
+      return;
+    }
+    this.writeClipboard(text, 'Copied selection to clipboard', clearAfter);
+  }
 
   copyAll(): void {
     this.term.selectAll();
     const content = this.term.getSelection();
-    this.term.clearSelection();
-    navigator.clipboard.writeText(content).catch(() => {});
-    this.logEvent('Copied all terminal output to clipboard');
+    this.writeClipboard(content, 'Copied all terminal output to clipboard', true);
   }
 
   pasteFromClipboard(): void {
@@ -407,6 +438,11 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
   }
 
   onContextMenu(event: MouseEvent): boolean {
+    if (event.shiftKey && this.term.hasSelection()) {
+      event.preventDefault();
+      this.copySelection(false);
+      return false;
+    }
     if (this.settings.rightClickPaste) {
       event.preventDefault();
       this.pasteFromClipboard();
@@ -417,6 +453,66 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
 
   private pasteText(text: string): void {
     this.sendInput(text);
+    this.logEvent('Pasted from clipboard');
+  }
+
+  private onTerminalMouseUp(event: MouseEvent): void {
+    if (event.button !== 0 || !this.settings.copyOnSelect) {
+      return;
+    }
+    if (this.term.hasSelection()) {
+      this.copySelection(false);
+    }
+  }
+
+  private onTerminalAuxClick(event: MouseEvent): void {
+    if (event.button !== 1) {
+      return;
+    }
+    event.preventDefault();
+    this.pasteFromClipboard();
+  }
+
+  /** PuTTY-style shortcuts: Ctrl+Shift+C/V, Ctrl+Insert, Shift+Insert. */
+  private handleTerminalKeyEvent(event: KeyboardEvent): boolean {
+    if (event.type !== 'keydown') {
+      return true;
+    }
+
+    const mod = event.ctrlKey || event.metaKey;
+    const key = event.key;
+
+    if (mod && event.shiftKey && key.toLowerCase() === 'c') {
+      event.preventDefault();
+      this.copySelection(false);
+      return false;
+    }
+    if (mod && event.shiftKey && key.toLowerCase() === 'v') {
+      event.preventDefault();
+      this.pasteFromClipboard();
+      return false;
+    }
+    if (event.ctrlKey && key === 'Insert') {
+      event.preventDefault();
+      this.copySelection(false);
+      return false;
+    }
+    if (event.shiftKey && key === 'Insert' && !event.ctrlKey) {
+      event.preventDefault();
+      this.pasteFromClipboard();
+      return false;
+    }
+
+    return true;
+  }
+
+  private writeClipboard(text: string, logMessage: string, clearSelection: boolean): void {
+    navigator.clipboard.writeText(text).then(() => {
+      this.logEvent(logMessage);
+      if (clearSelection) {
+        this.term.clearSelection();
+      }
+    }).catch(() => {});
   }
 
   clearScrollback(): void {

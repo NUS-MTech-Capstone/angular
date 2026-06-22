@@ -32,6 +32,26 @@ npm test -- --watch=false
 npm run build
 ```
 
+## Selenium E2E tests
+
+Browser tests live under `e2e/` and use Chrome via `selenium-webdriver`.
+They require the dev auth flow (`AUTH_MODE=dev` on nest-backend) plus both
+services running locally.
+
+```bash
+# terminal 1
+cd ../nest-backend && AUTH_MODE=dev npm run start:dev
+
+# terminal 2
+npm start
+
+# terminal 3
+npm run test:e2e
+npm run test:e2e:headless
+```
+
+See [e2e/README.md](e2e/README.md) for environment variables and suite details.
+
 ## Container
 
 The image builds with Node.js 22 and serves the compiled SPA from unprivileged

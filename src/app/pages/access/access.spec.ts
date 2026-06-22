@@ -92,4 +92,27 @@ describe('Access', () => {
 
     expect(sessionsApi.end).toHaveBeenCalledWith('s1');
   });
+
+  it('opens a terminal window with server and change-request context', () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    const server = {
+      vmId: 'vm-1',
+      hostname: 'host-dev-1',
+      ipAddress: '10.0.10.203',
+      selectedOsUser: 'ec2-user',
+    } as never;
+
+    component.launchNew(server);
+
+    expect(openSpy).toHaveBeenCalledWith(
+      expect.stringContaining('/terminal?'),
+      '_blank',
+      'popup=yes,width=1200,height=760',
+    );
+    const url = openSpy.mock.calls[0][0] as string;
+    expect(url).toContain('user=ec2-user');
+    expect(url).toContain('host=host-dev-1');
+    expect(url).toContain('hostId=vm-1');
+    openSpy.mockRestore();
+  });
 });

@@ -76,10 +76,31 @@
   flex: 1;
   min-height: 0;
   padding: 8px;
+  cursor: text;
 }
 
-.terminal-host .xterm {
+.terminal-host ::ng-deep .xterm {
   height: 100%;
+}
+
+.terminal-host ::ng-deep .xterm .xterm-screen {
+  cursor: text;
+}
+
+.terminal-host ::ng-deep .xterm .xterm-selection div {
+  /* PuTTY-style solid selection block */
+  opacity: 1 !important;
+}
+
+.terminal-host ::ng-deep .xterm:focus .xterm-screen {
+  outline: none;
+}
+
+.setting-hint {
+  margin: -4px 0 12px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  line-height: 1.4;
 }
 
 .settings-section {
