@@ -23,10 +23,13 @@ import { ITheme, Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { apiPath } from '../../core/api.constants';
 
-/** Packet type bytes for outgoing messages (server defines inbound types). */
+/** Binary terminal protocol — must match proxy-dataplane/internal/protocol/packet.go */
 const enum PktType {
-  Data = 0x01,
-  Resize = 0x02,
+  Input = 0x00,
+  Output = 0x01,
+  Error = 0x02,
+  SessionEvent = 0x07,
+  Resize = 0x10,
 }
 
 interface TerminalSettings {
@@ -283,12 +286,25 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
 
     ws.onmessage = (event: MessageEvent) => {
       const packet = new Uint8Array(event.data as ArrayBuffer);
-      if (packet.length < 2) return;
+      if (packet.length < 1) return;
 
-      // First byte is a type discriminator; all remaining bytes are the payload.
-      // We write every payload to the terminal — the server controls what it sends.
       const payload = packet.slice(1);
-      this.term.write(new TextDecoder().decode(payload));
+      switch (packet[0]) {
+        case PktType.Output:
+          if (payload.length > 0) {
+            this.term.write(new TextDecoder().decode(payload));
+          }
+          break;
+        case PktType.Error: {
+          const msg = new TextDecoder().decode(payload);
+          this.writeLine(`\x1b[31m${msg}\x1b[0m`);
+          this.logEvent(`Server error: ${msg}`);
+          break;
+        }
+        case PktType.SessionEvent:
+          this.logEvent(new TextDecoder().decode(payload));
+          break;
+      }
     };
 
     ws.onerror = () => {
@@ -340,21 +356,23 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
 
     const dataBytes = this.encoder.encode(data);
     const packet = new Uint8Array(1 + dataBytes.length);
-    packet[0] = PktType.Data;
+    packet[0] = PktType.Input;
     packet.set(dataBytes, 1);
     this.ws.send(packet.buffer);
   }
 
-  /** Inform the server of the current terminal dimensions. */
+  /** Inform the server of the current terminal dimensions (big-endian cols + rows). */
   private sendResize(): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
 
     const cols = this.term.cols;
     const rows = this.term.rows;
-    const payload = this.encoder.encode(JSON.stringify({ cols, rows }));
-    const packet = new Uint8Array(1 + payload.length);
+    const packet = new Uint8Array(5);
     packet[0] = PktType.Resize;
-    packet.set(payload, 1);
+    packet[1] = (cols >> 8) & 0xff;
+    packet[2] = cols & 0xff;
+    packet[3] = (rows >> 8) & 0xff;
+    packet[4] = rows & 0xff;
     this.ws.send(packet.buffer);
   }
 
