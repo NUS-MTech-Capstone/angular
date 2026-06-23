@@ -216,6 +216,22 @@ describe('TerminalPage', () => {
     expect(lastTerm.write).toHaveBeenCalledWith('hello world');
   });
 
+  it('updates observer list from structured session events', () => {
+    const ws = openMockWebSocket();
+    const payload = new TextEncoder().encode(
+      JSON.stringify({ type: 'attachments', observers: ['observer-1', 'observer-2'] }),
+    );
+    const packet = new Uint8Array(1 + payload.length);
+    packet[0] = 0x07;
+    packet.set(payload, 1);
+    ws.onmessage?.({ data: packet.buffer } as MessageEvent);
+
+    expect(component.observerUserIds).toEqual(['observer-1', 'observer-2']);
+    expect(component.eventLog.some((entry) => entry.message.includes('Observers: observer-1, observer-2'))).toBe(
+      true,
+    );
+  });
+
   it('logs server error packets and writes them to the terminal', () => {
     const ws = openMockWebSocket();
     const payload = new TextEncoder().encode('permission denied');
@@ -384,6 +400,11 @@ describe('TerminalPage', () => {
     await observeFixture.whenStable();
 
     expect(MockWebSocket.instances[0].url).toContain('observer-token');
+    const ws = MockWebSocket.instances[0];
+    ws.onopen?.();
+    expect(ws.send).not.toHaveBeenCalled();
+    onDataHandler?.('whoami\r');
+    expect(ws.send).not.toHaveBeenCalled();
     testing.verify();
   });
 

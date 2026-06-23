@@ -49,6 +49,11 @@ interface EventLogEntry {
   message: string;
 }
 
+interface AttachmentEvent {
+  type: 'attachments';
+  observers: string[];
+}
+
 const SETTINGS_STORAGE_KEY = 'ddm-terminal-settings';
 
 const DEFAULT_SETTINGS: TerminalSettings = {
@@ -145,6 +150,7 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
   bellFlash = false;
   isSettingsOpen = false;
   isEventLogOpen = false;
+  observerUserIds: string[] = [];
 
   settings: TerminalSettings = { ...DEFAULT_SETTINGS };
   themeOptions = Object.keys(THEMES);
@@ -168,6 +174,10 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
     this.fitAddon.fit();
     this.sendResize();
   };
+
+  get isObserverMode(): boolean {
+    return this.sessionAccessMode === 'observe';
+  }
 
   constructor(
     private route: ActivatedRoute,
@@ -321,7 +331,7 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
           break;
         }
         case PktType.SessionEvent:
-          this.logEvent(new TextDecoder().decode(payload));
+          this.handleSessionEvent(new TextDecoder().decode(payload));
           break;
       }
     };
@@ -359,6 +369,7 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
 
   /** Send raw terminal input to the WebSocket as a binary packet. */
   private sendInput(data: string): void {
+    if (this.isObserverMode) return;
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
 
     const dataBytes = this.encoder.encode(data);
@@ -370,6 +381,7 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
 
   /** Inform the server of the current terminal dimensions (big-endian cols + rows). */
   private sendResize(): void {
+    if (this.isObserverMode) return;
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
 
     const cols = this.term.cols;
@@ -443,8 +455,39 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
   }
 
   private pasteText(text: string): void {
+    if (this.isObserverMode) {
+      this.logEvent('Paste ignored in observer mode');
+      return;
+    }
     this.sendInput(text);
     this.logEvent('Pasted from clipboard');
+  }
+
+  private handleSessionEvent(message: string): void {
+    const attachmentEvent = this.parseAttachmentEvent(message);
+    if (attachmentEvent) {
+      this.observerUserIds = attachmentEvent.observers;
+      this.logEvent(`Observers: ${this.observerUserIds.length ? this.observerUserIds.join(', ') : 'none'}`);
+      this.cd.detectChanges();
+      return;
+    }
+    this.logEvent(message);
+  }
+
+  private parseAttachmentEvent(message: string): AttachmentEvent | null {
+    try {
+      const parsed = JSON.parse(message) as Partial<AttachmentEvent>;
+      if (
+        parsed.type === 'attachments' &&
+        Array.isArray(parsed.observers) &&
+        parsed.observers.every((observer) => typeof observer === 'string')
+      ) {
+        return { type: 'attachments', observers: parsed.observers };
+      }
+    } catch {
+      return null;
+    }
+    return null;
   }
 
   private onTerminalMouseUp(event: MouseEvent): void {

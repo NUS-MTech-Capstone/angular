@@ -53,6 +53,16 @@
   color: #9aa1b3;
 }
 
+.session-mode,
+.session-observers {
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #d7dbea;
+  font-size: 12px;
+  line-height: 18px;
+}
+
 .toolbar-actions {
   display: flex;
   align-items: center;

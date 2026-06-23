@@ -189,4 +189,94 @@ describe('Access', () => {
     expect(url).toContain('mode=observe');
     openSpy.mockRestore();
   });
+
+  it('loads CR-scoped gateway sessions and wires Watch with the real session id', () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    sessionsApi.list.mockClear();
+    sessionsApi.list.mockReturnValue(
+      of({
+        sessions: [
+          {
+            sessionId: 'gateway-session-cr-1',
+            userId: 'owner-sub',
+            hostId: 'host-dev-1',
+            crId: 'cr-1',
+            connectionType: 'ssh',
+            status: 'ACTIVE',
+            createdAt: '2026-06-18T00:00:00.000Z',
+            lastHeartbeatAt: '2026-06-18T00:01:00.000Z',
+            leaseExpiresAt: '2026-06-18T00:06:00.000Z',
+          },
+          {
+            sessionId: 'other-cr-session',
+            userId: 'owner-sub',
+            hostId: 'host-dev-1',
+            crId: 'cr-2',
+            connectionType: 'ssh',
+            status: 'ACTIVE',
+            createdAt: '2026-06-18T00:00:00.000Z',
+            lastHeartbeatAt: '2026-06-18T00:01:00.000Z',
+            leaseExpiresAt: '2026-06-18T00:06:00.000Z',
+          },
+          {
+            sessionId: 'other-host-session',
+            userId: 'owner-sub',
+            hostId: 'host-dev-2',
+            crId: 'cr-1',
+            connectionType: 'ssh',
+            status: 'ACTIVE',
+            createdAt: '2026-06-18T00:00:00.000Z',
+            lastHeartbeatAt: '2026-06-18T00:01:00.000Z',
+            leaseExpiresAt: '2026-06-18T00:06:00.000Z',
+          },
+        ],
+      }),
+    );
+    component.accessibleRequests = [
+      {
+        id: 'cr-1',
+        title: 'Patch host',
+        description: 'Patch host-dev-1',
+        requester: 'requester',
+        approvalRoute: 'standard',
+        status: 'Approved',
+        createdAt: '2026-06-18T00:00:00.000Z',
+        history: [],
+        activities: [],
+        vmIds: ['vm-1'],
+        allowedRoles: [],
+        implementerGroupIds: [],
+        implementationStartAt: '2026-06-18T00:00:00.000Z',
+        implementationEndAt: '2026-06-18T01:00:00.000Z',
+        osUsers: ['ec2-user'],
+        implementerGroups: [],
+        vms: [
+          {
+            id: 'vm-1',
+            hostname: 'host-dev-1',
+            ipAddress: '10.0.10.203',
+            assetStatus: 'Active',
+            osVersion: 'RHEL',
+            sshPort: 22,
+            tags: [],
+            createdAt: '2026-06-18T00:00:00.000Z',
+            updatedAt: '2026-06-18T00:00:00.000Z',
+          },
+        ],
+      },
+    ];
+
+    component.selectSection('Change Requests');
+
+    expect(sessionsApi.list).toHaveBeenCalledWith({ status: 'ACTIVE' });
+    expect(component.crServers[0].sessions).toHaveLength(1);
+    expect(component.crServers[0].sessions[0].sessionId).toBe('gateway-session-cr-1');
+
+    component.watchSession(component.crServers[0], component.crServers[0].sessions[0]);
+
+    const url = openSpy.mock.calls[0][0] as string;
+    expect(url).toContain('sessionId=gateway-session-cr-1');
+    expect(url).toContain('mode=observe');
+    openSpy.mockRestore();
+  });
 });

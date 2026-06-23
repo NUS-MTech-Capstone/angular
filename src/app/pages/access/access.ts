@@ -127,6 +127,8 @@ export class Access implements OnInit {
       this.accessibleRequests.length
     ) {
       this.onCrSelected(this.accessibleRequests[0].id);
+    } else if (section === 'Change Requests') {
+      this.loadAllSessions();
     }
     if (section === 'Sessions') {
       this.loadAllSessions();
@@ -151,27 +153,38 @@ export class Access implements OnInit {
   }
 
   private syncServerSessions(backendSessions: GatewaySession[]): void {
-    const byHost = new Map<string, GatewaySession[]>();
-    for (const s of backendSessions) {
-      const list = byHost.get(s.hostId) ?? [];
-      list.push(s);
-      byHost.set(s.hostId, list);
-    }
     // Update groupServers sessions lists
     for (const server of this.groupServers) {
-      const active: ActiveSession[] = (byHost.get(server.hostname) ?? []).map((s) =>
+      const active: ActiveSession[] = this.sessionsForServer(backendSessions, server).map((s) =>
         this.gatewayToActiveSession(s, server),
       );
       server.sessions = active;
       this.sessionsByVmId.set(server.vmId, active);
     }
     for (const server of this.crServers) {
-      const active: ActiveSession[] = (byHost.get(server.hostname) ?? []).map((s) =>
+      const active: ActiveSession[] = this.sessionsForServer(
+        backendSessions,
+        server,
+        this.selectedRequest?.id,
+      ).map((s) =>
         this.gatewayToActiveSession(s, server),
       );
       server.sessions = active;
       this.sessionsByVmId.set(server.vmId, active);
     }
+  }
+
+  private sessionsForServer(
+    sessions: GatewaySession[],
+    server: AccessServer,
+    crId?: string,
+  ): GatewaySession[] {
+    return sessions.filter(
+      (session) =>
+        session.hostId === server.hostname &&
+        (!crId || session.crId === crId) &&
+        session.status === 'ACTIVE',
+    );
   }
 
   private gatewayToActiveSession(s: GatewaySession, server?: AccessServer): ActiveSession {
@@ -323,6 +336,10 @@ export class Access implements OnInit {
         selectedOsUser: osUsers[0] ?? '',
       };
     });
+    this.syncServerSessions(this.allActiveSessions);
+    if (this.activeSection === 'Change Requests') {
+      this.loadAllSessions();
+    }
   }
 
   crNumber(request: AccessibleChangeRequest): string {
