@@ -171,7 +171,7 @@
               <th>Owner</th>
               <th>Created</th>
               <th>Status</th>
-              <th nzWidth="160px">Actions</th>
+              <th nzWidth="220px">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -199,17 +199,15 @@
                       Rejoin
                     </button>
                   </ng-container>
-                  <ng-container *ngIf="!isMySession(session)">
-                    <button
-                      *nzSpaceItem
-                      nz-button
-                      nzSize="small"
-                      [disabled]="session.status !== 'ACTIVE' || !can('access.view')"
-                      (click)="observeGatewaySession(session)">
-                      <span nz-icon nzType="eye" nzTheme="outline"></span>
-                      Observe
-                    </button>
-                  </ng-container>
+                  <button
+                    *nzSpaceItem
+                    nz-button
+                    nzSize="small"
+                    [disabled]="session.status !== 'ACTIVE'"
+                    (click)="observeGatewaySession(session)">
+                    <span nz-icon nzType="eye" nzTheme="outline"></span>
+                    Observe
+                  </button>
                 </nz-space>
               </td>
             </tr>
@@ -303,7 +301,6 @@
                     <th>OS User</th>
                     <th>Current Implementor</th>
                     <th>Action</th>
-                    <th>Observers</th>
                     <th>Action</th>
                   </tr>
                 </thead>
@@ -338,24 +335,12 @@
                       </nz-space>
                     </td>
                     <td>
-                      <nz-select
-                        [(ngModel)]="session.observer"
-                        nzAllowClear
-                        nzPlaceHolder="-"
-                        class="observer-select"
-                        nzSize="small">
-                        <nz-option
-                          *ngFor="let observer of observerOptions"
-                          [nzValue]="observer"
-                          [nzLabel]="observer" />
-                      </nz-select>
-                    </td>
-                    <td>
                       <button
                         nz-button
                         nzSize="small"
                         class="btn-watch"
-                        [disabled]="!session.canWatch || !can('access.watch')">
+                        [disabled]="!session.canWatch"
+                        (click)="watchSession(server, session)">
                         Watch
                       </button>
                     </td>

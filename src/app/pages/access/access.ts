@@ -34,7 +34,6 @@ interface ActiveSession {
   primaryEnabled: boolean;
   canStop: boolean;
   canWatch: boolean;
-  observer: string | null;
   /** Gateway session ID assigned by Proxy Control Plane. */
   sessionId?: string;
   gatewayHostId: string;
@@ -86,7 +85,6 @@ export class Access implements OnInit {
   isPanelCollapsed = false;
   crSearchTerm = '';
   serverSearchTerm = '';
-  observerOptions = ['john', 'bob', 'arabasta', 'keiyam'];
 
   accessibleRequests: AccessibleChangeRequest[] = [];
   selectedRequestId?: string;
@@ -188,7 +186,6 @@ export class Access implements OnInit {
       primaryEnabled: true,
       canStop: false,
       canWatch: true,
-      observer: null,
       sessionId: s.sessionId,
       gatewayHostId: s.hostId,
     };
@@ -408,10 +405,19 @@ export class Access implements OnInit {
     );
   }
 
+  watchSession(server: AccessServer, session: ActiveSession): void {
+    this.openTerminalWindow(
+      server,
+      session.osUser,
+      session.crNumber,
+      session.crId ?? '',
+      session.sessionId,
+      'observe',
+    );
+  }
+
   canUseSessionAction(session: ActiveSession): boolean {
-    return session.primaryAction === 'Observe'
-      ? this.can('access.view')
-      : this.can('access.launch');
+    return session.primaryAction === 'Observe' || this.can('access.launch');
   }
 
   private openTerminalWindow(

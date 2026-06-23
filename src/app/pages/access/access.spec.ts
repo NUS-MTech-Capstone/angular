@@ -16,6 +16,10 @@ describe('Access', () => {
   let sessionsApi: {
     list: ReturnType<typeof vi.fn>;
   };
+  let authService: {
+    user: ReturnType<typeof vi.fn>;
+    hasPermission: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(async () => {
     changeRequestService = {
@@ -29,6 +33,10 @@ describe('Access', () => {
     sessionsApi = {
       list: vi.fn(() => of({ sessions: [] })),
     };
+    authService = {
+      user: vi.fn(() => ({ username: 'testuser', sub: 'user-sub' })),
+      hasPermission: vi.fn(() => true),
+    };
 
     await TestBed.configureTestingModule({
       imports: [Access],
@@ -37,13 +45,7 @@ describe('Access', () => {
         { provide: ChangeRequestService, useValue: changeRequestService },
         { provide: ImplementerGroupService, useValue: implementerGroupService },
         { provide: SessionsApiService, useValue: sessionsApi },
-        {
-          provide: AuthService,
-          useValue: {
-            user: vi.fn(() => ({ username: 'testuser', sub: 'user-sub' })),
-            hasPermission: vi.fn(() => true),
-          },
-        },
+        { provide: AuthService, useValue: authService },
       ],
     }).compileComponents();
 
@@ -132,6 +134,55 @@ describe('Access', () => {
       lastHeartbeatAt: '2026-06-18T00:01:00.000Z',
       leaseExpiresAt: '2026-06-18T00:06:00.000Z',
     } as never);
+
+    const url = openSpy.mock.calls[0][0] as string;
+    expect(url).toContain('sessionId=gateway-session-1');
+    expect(url).toContain('mode=observe');
+    openSpy.mockRestore();
+  });
+
+  it('opens owner observe with the gateway session id', () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+
+    component.observeGatewaySession({
+      sessionId: 'gateway-session-1',
+      userId: 'user-sub',
+      hostId: 'host-dev-1',
+      crId: 'cr-1',
+      connectionType: 'ssh',
+      status: 'ACTIVE',
+      createdAt: '2026-06-18T00:00:00.000Z',
+      lastHeartbeatAt: '2026-06-18T00:01:00.000Z',
+      leaseExpiresAt: '2026-06-18T00:06:00.000Z',
+    } as never);
+
+    const url = openSpy.mock.calls[0][0] as string;
+    expect(url).toContain('sessionId=gateway-session-1');
+    expect(url).toContain('mode=observe');
+    openSpy.mockRestore();
+  });
+
+  it('does not require view permission for observe session actions', () => {
+    authService.hasPermission.mockReturnValue(false);
+
+    expect(component.canUseSessionAction({ primaryAction: 'Observe' } as never)).toBe(true);
+    expect(component.canUseSessionAction({ primaryAction: 'Rejoin' } as never)).toBe(false);
+  });
+
+  it('wires watch to the observe terminal route', () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    const server = {
+      hostname: 'host-dev-1',
+      ipAddress: '10.0.10.203',
+    } as never;
+    const session = {
+      osUser: 'ec2-user',
+      crNumber: 'CR-1',
+      crId: 'cr-1',
+      sessionId: 'gateway-session-1',
+    } as never;
+
+    component.watchSession(server, session);
 
     const url = openSpy.mock.calls[0][0] as string;
     expect(url).toContain('sessionId=gateway-session-1');
