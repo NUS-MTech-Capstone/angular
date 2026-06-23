@@ -10,5 +10,6 @@ jobs:
     uses: NUS-MTech-Capstone/github-actions-shared/.github/workflows/node-ci.yaml@main
     with:
       node-version: "22"
-      test-command: npm test -- --watch=false
+      test-command: npm test -- --watch=false --coverage --coverage-reporters=lcov
+      coverage-lcov-path: coverage/fe/lcov.info
       build-command: npm run build -- --configuration production
