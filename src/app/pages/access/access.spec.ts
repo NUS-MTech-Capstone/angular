@@ -15,6 +15,7 @@ describe('Access', () => {
   let implementerGroupService: { findAccessibleVms: ReturnType<typeof vi.fn> };
   let sessionsApi: {
     list: ReturnType<typeof vi.fn>;
+    close: ReturnType<typeof vi.fn>;
   };
   let authService: {
     user: ReturnType<typeof vi.fn>;
@@ -32,6 +33,7 @@ describe('Access', () => {
     };
     sessionsApi = {
       list: vi.fn(() => of({ sessions: [] })),
+      close: vi.fn(() => of({ sessionId: 'gateway-session-1', status: 'CLOSED' })),
     };
     authService = {
       user: vi.fn(() => ({ username: 'testuser', sub: 'user-sub' })),
@@ -278,5 +280,62 @@ describe('Access', () => {
     expect(url).toContain('sessionId=gateway-session-cr-1');
     expect(url).toContain('mode=observe');
     openSpy.mockRestore();
+  });
+
+  it('enables Stop for owned sessions and users with access.stop', () => {
+    authService.hasPermission.mockImplementation((permission: string) => permission === 'access.stop');
+
+    const owned = component['gatewayToActiveSession']({
+      sessionId: 'gateway-session-1',
+      userId: 'user-sub',
+      hostId: 'host-dev-1',
+      crId: 'cr-1',
+      connectionType: 'ssh',
+      status: 'ACTIVE',
+      createdAt: '2026-06-18T00:00:00.000Z',
+      lastHeartbeatAt: '2026-06-18T00:01:00.000Z',
+      leaseExpiresAt: '2026-06-18T00:06:00.000Z',
+    } as never);
+    const other = component['gatewayToActiveSession']({
+      sessionId: 'gateway-session-2',
+      userId: 'other-sub',
+      hostId: 'host-dev-1',
+      crId: 'cr-1',
+      connectionType: 'ssh',
+      status: 'ACTIVE',
+      createdAt: '2026-06-18T00:00:00.000Z',
+      lastHeartbeatAt: '2026-06-18T00:01:00.000Z',
+      leaseExpiresAt: '2026-06-18T00:06:00.000Z',
+    } as never);
+
+    expect(owned.canStop).toBe(true);
+    expect(other.canStop).toBe(true);
+  });
+
+  it('calls gateway close when stopping a session', () => {
+    const session = {
+      sessionId: 'gateway-session-1',
+      crNumber: 'CR-1',
+      crId: 'cr-1',
+      createdBy: 'owner-sub',
+      lastActivity: 'Active',
+      osUser: 'ec2-user',
+      currentImplementor: 'owner-sub',
+      primaryAction: 'Rejoin' as const,
+      primaryEnabled: true,
+      canStop: true,
+      canWatch: true,
+      gatewayHostId: 'host-dev-1',
+    };
+    const server = {
+      vmId: 'vm-1',
+      hostname: 'host-dev-1',
+      sessions: [session],
+    } as never;
+
+    component.stopSession(server, session as never);
+
+    expect(sessionsApi.close).toHaveBeenCalledWith('gateway-session-1');
+    expect((server as { sessions: unknown[] }).sessions).toHaveLength(0);
   });
 });

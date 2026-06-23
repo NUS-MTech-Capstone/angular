@@ -17,6 +17,8 @@ does not store production bearer or PKCE tokens.
 - Owner rejoin uses `POST /sessions/{gatewaySessionId}/rejoin`.
 - Authenticated read-only observing uses
   `POST /sessions/{gatewaySessionId}/observe` and receives an observer token.
+- Session stop uses `POST /sessions/{gatewaySessionId}/close`.
+- Active session lists use `GET /sessions`.
 - WebSockets connect directly to `/sessions/{sessionId}/ws`.
 
 When a production API call returns 401, the client clears its cached profile and

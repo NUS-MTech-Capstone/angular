@@ -62,4 +62,8 @@ export class SessionsApiService {
   observe(id: string): Observable<SessionConnectionResponse> {
     return this.http.post<SessionConnectionResponse>(`${this.base}/${id}/observe`, {});
   }
+
+  close(id: string): Observable<GatewaySession> {
+    return this.http.post<GatewaySession>(`${this.base}/${id}/close`, {});
+  }
 }

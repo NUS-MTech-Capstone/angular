@@ -115,4 +115,20 @@ describe('SessionsApiService', () => {
 
     expect(result).toEqual(observeResponse);
   });
+
+  it('POSTs to gateway close and returns the closed session', () => {
+    const closedSession: GatewaySession = {
+      ...mockSession(),
+      status: 'CLOSED',
+    };
+    let result: GatewaySession | undefined;
+
+    service.close('session-1').subscribe((r) => (result = r));
+
+    const req = http.expectOne(`${BASE_URL}/session-1/close`);
+    expect(req.request.method).toBe('POST');
+    req.flush(closedSession);
+
+    expect(result).toEqual(closedSession);
+  });
 });

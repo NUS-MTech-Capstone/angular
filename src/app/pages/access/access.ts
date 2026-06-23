@@ -197,7 +197,7 @@ export class Access implements OnInit {
       currentImplementor: s.userId ?? '',
       primaryAction: s.userId === this.auth.user()?.sub ? 'Rejoin' : 'Observe',
       primaryEnabled: true,
-      canStop: false,
+      canStop: this.isMySession(s) || this.can('access.stop'),
       canWatch: true,
       sessionId: s.sessionId,
       gatewayHostId: s.hostId,
@@ -467,6 +467,27 @@ export class Access implements OnInit {
   }
 
   stopSession(server: AccessServer, session: ActiveSession): void {
+    if (!session.sessionId) {
+      this.removeLocalSession(server, session);
+      return;
+    }
+
+    this.sessionsApi.close(session.sessionId).subscribe({
+      next: () => {
+        this.removeLocalSession(server, session);
+        this.allActiveSessions = this.allActiveSessions.filter(
+          (s) => s.sessionId !== session.sessionId,
+        );
+        this.cd.detectChanges();
+      },
+      error: () => {
+        this.loadAllSessions();
+        this.cd.detectChanges();
+      },
+    });
+  }
+
+  private removeLocalSession(server: AccessServer, session: ActiveSession): void {
     const sessions = server.sessions.filter((s) => s !== session);
     server.sessions = sessions;
     this.sessionsByVmId.set(server.vmId, sessions);
