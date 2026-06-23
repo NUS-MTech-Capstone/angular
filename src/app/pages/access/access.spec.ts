@@ -115,4 +115,42 @@ describe('Access', () => {
     expect(url).toContain('hostId=vm-1');
     openSpy.mockRestore();
   });
+
+  it('opens owner rejoin with the DDM session id', () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+
+    component.reconnectBackendSession({
+      id: 'ddm-session-1',
+      hostId: 'vm-1',
+      hostname: 'host-dev-1',
+      ipAddress: '10.0.10.203',
+      crId: 'cr-1',
+      crNumber: 'CR-1',
+      osUser: 'ec2-user',
+    } as never);
+
+    const url = openSpy.mock.calls[0][0] as string;
+    expect(url).toContain('sessionId=ddm-session-1');
+    expect(url).toContain('mode=rejoin');
+    openSpy.mockRestore();
+  });
+
+  it('opens non-owner observe with the DDM session id', () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+
+    component.observeBackendSession({
+      id: 'ddm-session-1',
+      hostId: 'vm-1',
+      hostname: 'host-dev-1',
+      ipAddress: '10.0.10.203',
+      crId: 'cr-1',
+      crNumber: 'CR-1',
+      osUser: 'ec2-user',
+    } as never);
+
+    const url = openSpy.mock.calls[0][0] as string;
+    expect(url).toContain('sessionId=ddm-session-1');
+    expect(url).toContain('mode=observe');
+    openSpy.mockRestore();
+  });
 });

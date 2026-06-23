@@ -305,4 +305,129 @@ describe('TerminalPage', () => {
     expect(errorFixture.componentInstance.connectionError).toBe('STS denied');
     expect(errorFixture.componentInstance.connecting).toBe(false);
   });
+
+  it('rejoins an existing session when sessionId is present', async () => {
+    httpMock.verify();
+    vi.unstubAllGlobals();
+    MockWebSocket.instances = [];
+
+    await TestBed.resetTestingModule();
+    vi.stubGlobal('WebSocket', MockWebSocket);
+    await TestBed.configureTestingModule({
+      imports: [TerminalPage],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideNzIcons(icons),
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: {
+              queryParamMap: {
+                get: vi.fn((key: string) => ({ sessionId: 'session-1' })[key] ?? null),
+              },
+            },
+          },
+        },
+        { provide: Title, useValue: { setTitle: vi.fn() } },
+      ],
+    }).compileComponents();
+
+    const rejoinFixture = TestBed.createComponent(TerminalPage);
+    rejoinFixture.detectChanges();
+
+    const testing = TestBed.inject(HttpTestingController);
+    const req = testing.expectOne(apiPath('sessions/session-1/rejoin'));
+    expect(req.request.method).toBe('POST');
+    req.flush({ websocketUrl: 'wss://gateway.test/ws', sessionToken: 'fresh-token' });
+    await rejoinFixture.whenStable();
+
+    expect(MockWebSocket.instances[0].url).toContain('fresh-token');
+    testing.verify();
+  });
+
+  it('observes an existing session when mode=observe is present', async () => {
+    httpMock.verify();
+    vi.unstubAllGlobals();
+    MockWebSocket.instances = [];
+
+    await TestBed.resetTestingModule();
+    vi.stubGlobal('WebSocket', MockWebSocket);
+    await TestBed.configureTestingModule({
+      imports: [TerminalPage],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideNzIcons(icons),
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: {
+              queryParamMap: {
+                get: vi.fn((key: string) =>
+                  ({ sessionId: 'session-1', mode: 'observe' })[key] ?? null,
+                ),
+              },
+            },
+          },
+        },
+        { provide: Title, useValue: { setTitle: vi.fn() } },
+      ],
+    }).compileComponents();
+
+    const observeFixture = TestBed.createComponent(TerminalPage);
+    observeFixture.detectChanges();
+
+    const testing = TestBed.inject(HttpTestingController);
+    const req = testing.expectOne(apiPath('sessions/session-1/observe'));
+    expect(req.request.method).toBe('POST');
+    req.flush({ websocketUrl: 'wss://gateway.test/ws', sessionToken: 'observer-token' });
+    await observeFixture.whenStable();
+
+    expect(MockWebSocket.instances[0].url).toContain('observer-token');
+    testing.verify();
+  });
+
+  it('surfaces explicit rejoin failures without starting a new session', async () => {
+    httpMock.verify();
+    vi.unstubAllGlobals();
+    MockWebSocket.instances = [];
+
+    await TestBed.resetTestingModule();
+    vi.stubGlobal('WebSocket', MockWebSocket);
+    await TestBed.configureTestingModule({
+      imports: [TerminalPage],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideNzIcons(icons),
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: {
+              queryParamMap: {
+                get: vi.fn((key: string) => ({ sessionId: 'session-1' })[key] ?? null),
+              },
+            },
+          },
+        },
+        { provide: Title, useValue: { setTitle: vi.fn() } },
+      ],
+    }).compileComponents();
+
+    const rejoinFixture = TestBed.createComponent(TerminalPage);
+    rejoinFixture.detectChanges();
+
+    const testing = TestBed.inject(HttpTestingController);
+    const req = testing.expectOne(apiPath('sessions/session-1/rejoin'));
+    req.flush({ message: 'Only the original session owner can rejoin' }, { status: 403, statusText: 'Forbidden' });
+    await rejoinFixture.whenStable();
+
+    expect(rejoinFixture.componentInstance.connectionError).toBe(
+      'Only the original session owner can rejoin',
+    );
+    testing.expectNone(apiPath('sessions/start'));
+    expect(MockWebSocket.instances.length).toBe(0);
+    testing.verify();
+  });
 });

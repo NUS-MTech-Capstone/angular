@@ -32,7 +32,7 @@ interface ActiveSession {
   lastActivity: string;
   osUser: string;
   currentImplementor: string;
-  primaryAction: 'Join' | 'Request';
+  primaryAction: 'Rejoin' | 'Observe' | 'Request';
   primaryEnabled: boolean;
   canStop: boolean;
   canWatch: boolean;
@@ -187,7 +187,7 @@ export class Access implements OnInit {
       lastActivity: s.lastActivityAt ? new Date(s.lastActivityAt).toLocaleTimeString() : 'Active',
       osUser: s.osUser,
       currentImplementor: s.createdBy,
-      primaryAction: s.createdBy === this.currentUser ? 'Join' : 'Join',
+      primaryAction: s.createdBy === this.currentUser ? 'Rejoin' : 'Observe',
       primaryEnabled: true,
       canStop: true,
       canWatch: true,
@@ -228,6 +228,14 @@ export class Access implements OnInit {
   }
 
   reconnectBackendSession(session: SessionRecord): void {
+    this.openBackendSession(session, 'rejoin');
+  }
+
+  observeBackendSession(session: SessionRecord): void {
+    this.openBackendSession(session, 'observe');
+  }
+
+  private openBackendSession(session: SessionRecord, mode: 'rejoin' | 'observe'): void {
     const params = new URLSearchParams({
       user: session.osUser,
       host: session.hostname,
@@ -236,12 +244,13 @@ export class Access implements OnInit {
       hostId: session.hostId,
       crId: session.crId ?? '',
       sessionId: session.id,
+      mode,
     });
     window.open(`/terminal?${params.toString()}`, '_blank', 'popup=yes,width=1200,height=760');
   }
 
   joinBackendSession(session: SessionRecord): void {
-    this.reconnectBackendSession(session);
+    this.observeBackendSession(session);
   }
 
   private loadAccessibleAssets(): void {
@@ -404,7 +413,14 @@ export class Access implements OnInit {
       session.crNumber,
       session.crId ?? '',
       session.sessionId,
+      session.primaryAction === 'Observe' ? 'observe' : 'rejoin',
     );
+  }
+
+  canUseSessionAction(session: ActiveSession): boolean {
+    return session.primaryAction === 'Observe'
+      ? this.can('access.view')
+      : this.can('access.launch');
   }
 
   private openTerminalWindow(
@@ -413,6 +429,7 @@ export class Access implements OnInit {
     crLabel: string,
     crId: string,
     sessionId?: string,
+    mode?: 'rejoin' | 'observe',
   ): void {
     const p: Record<string, string> = {
       user: osUser,
@@ -423,6 +440,7 @@ export class Access implements OnInit {
       crId,
     };
     if (sessionId) p['sessionId'] = sessionId;
+    if (mode) p['mode'] = mode;
     window.open(
       `/terminal?${new URLSearchParams(p).toString()}`,
       '_blank',

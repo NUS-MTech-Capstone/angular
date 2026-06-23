@@ -196,7 +196,7 @@
                       [disabled]="session.status === 'ended'"
                       (click)="reconnectBackendSession(session)">
                       <span nz-icon nzType="reload" nzTheme="outline"></span>
-                      Reconnect
+                      Rejoin
                     </button>
                   </ng-container>
                   <ng-container *ngIf="!isMySession(session)">
@@ -204,10 +204,10 @@
                       *nzSpaceItem
                       nz-button
                       nzSize="small"
-                      [disabled]="session.status !== 'active' || !can('access.launch')"
-                      (click)="joinBackendSession(session)">
-                      <span nz-icon nzType="login" nzTheme="outline"></span>
-                      Join
+                      [disabled]="session.status !== 'active' || !can('access.view')"
+                      (click)="observeBackendSession(session)">
+                      <span nz-icon nzType="eye" nzTheme="outline"></span>
+                      Observe
                     </button>
                   </ng-container>
                   <button
@@ -333,8 +333,8 @@
                           nz-button
                           nzSize="small"
                           class="btn-join"
-                          [disabled]="!session.primaryEnabled || !can('access.launch')"
-                          (click)="session.primaryAction === 'Join' ? joinSession(server, session) : requestSession(session)">
+                          [disabled]="!session.primaryEnabled || !canUseSessionAction(session)"
+                          (click)="session.primaryAction === 'Request' ? requestSession(session) : joinSession(server, session)">
                           {{ session.primaryAction }}
                         </button>
                         <button

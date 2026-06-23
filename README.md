@@ -12,6 +12,11 @@ does not store production bearer or PKCE tokens.
 - Logout navigates the browser to `/ddm/auth/logout`.
 - Data APIs remain under same-origin `/ddm`.
 - Session creation uses same-origin `POST /sessions/start`.
+- Owner rejoin uses same-origin `POST /ddm/sessions/{ddmSessionId}/rejoin`
+  and opens the returned direct dataplane WebSocket.
+- Non-owner session viewing uses same-origin
+  `POST /ddm/sessions/{ddmSessionId}/observe` and receives a read-only
+  observer token.
 - WebSockets connect directly to `/sessions/{sessionId}/ws`.
 
 When a production API call returns 401, the client clears its cached profile and

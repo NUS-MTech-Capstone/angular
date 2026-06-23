@@ -137,6 +137,7 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
   crId = '';
   /** When set, skip sessions/start and reconnect to this existing session. */
   reconnectSessionId = '';
+  sessionAccessMode: 'rejoin' | 'observe' = 'rejoin';
 
   connected = false;
   connecting = false;
@@ -184,6 +185,7 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
     this.hostId = params.get('hostId') || 'host-dev-1';
     this.crId = params.get('crId') || 'cr-test-1';
     this.reconnectSessionId = params.get('sessionId') || '';
+    this.sessionAccessMode = params.get('mode') === 'observe' ? 'observe' : 'rejoin';
     this.titleService.setTitle(`${this.osUser}@${this.ip} - DenDenMushi SSH`);
 
     this.loadSettings();
@@ -234,20 +236,24 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
     this.logEvent(`Session requested as ${this.osUser}@${this.ip} (${this.crNumber})`);
 
     if (this.reconnectSessionId) {
-      // UC: Reconnect Session — ask the gateway for a fresh WebSocket ticket
-      // via POST /sessions/{id}/rejoin (gateway spec).
+      // UC: Reconnect/Observe Session — ask the backend for a fresh
+      // WebSocket ticket using the DDM session ID from the route.
+      const action = this.sessionAccessMode === 'observe' ? 'observe' : 'rejoin';
       this.http
         .post<{ websocketUrl: string; sessionToken: string }>(
-          apiPath(`sessions/${this.reconnectSessionId}/rejoin`),
+          apiPath(`sessions/${this.reconnectSessionId}/${action}`),
           {},
         )
         .subscribe({
           next: (session) => this.openWebSocket(session.websocketUrl, session.sessionToken),
-          error: () => {
-            // Gateway session no longer rejoinable; start a fresh one
-            this.logEvent('Rejoin failed — starting new session');
-            this.reconnectSessionId = '';
-            this.startNewSession();
+          error: (err) => {
+            const msg: string =
+              err?.error?.message ?? err?.message ?? `${action} failed`;
+            this.connectionError = msg;
+            this.connecting = false;
+            this.writeLine(`\x1b[31mError: ${msg}\x1b[0m`);
+            this.logEvent(`${action} failed: ${msg}`);
+            this.cd.detectChanges();
           },
         });
     } else {
