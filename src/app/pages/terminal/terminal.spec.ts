@@ -7,7 +7,7 @@ import {
 import { ActivatedRoute } from '@angular/router';
 import { Title } from '@angular/platform-browser';
 import { provideNzIcons } from 'ng-zorro-antd/icon';
-import { apiPath } from '../../core/api.constants';
+import { gatewayPath } from '../../core/api.constants';
 import { icons } from '../../icons-provider';
 import { TerminalPage } from './terminal';
 
@@ -93,7 +93,7 @@ function flushSessionStart(
   httpMock: HttpTestingController,
   onRequest?: (body: unknown) => void,
 ): void {
-  const req = httpMock.expectOne(apiPath('sessions/start'));
+  const req = httpMock.expectOne(gatewayPath('sessions/start'));
   onRequest?.(req.request.body);
   req.flush({
     websocketUrl: 'wss://gateway.test/ws',
@@ -180,7 +180,6 @@ describe('TerminalPage', () => {
     expect(sessionStartBody).toEqual({
       hostId: 'vm-uuid-1',
       crId: 'cr-test-1',
-      osUser: 'testuser',
       connectionType: 'ssh',
     });
   });
@@ -298,7 +297,7 @@ describe('TerminalPage', () => {
     const errorFixture = TestBed.createComponent(TerminalPage);
     errorFixture.detectChanges();
 
-    const req = TestBed.inject(HttpTestingController).expectOne(apiPath('sessions/start'));
+    const req = TestBed.inject(HttpTestingController).expectOne(gatewayPath('sessions/start'));
     req.flush({ message: 'STS denied' }, { status: 403, statusText: 'Forbidden' });
     await errorFixture.whenStable();
 
@@ -337,7 +336,7 @@ describe('TerminalPage', () => {
     rejoinFixture.detectChanges();
 
     const testing = TestBed.inject(HttpTestingController);
-    const req = testing.expectOne(apiPath('sessions/session-1/rejoin'));
+    const req = testing.expectOne(gatewayPath('sessions/session-1/rejoin'));
     expect(req.request.method).toBe('POST');
     req.flush({ websocketUrl: 'wss://gateway.test/ws', sessionToken: 'fresh-token' });
     await rejoinFixture.whenStable();
@@ -379,7 +378,7 @@ describe('TerminalPage', () => {
     observeFixture.detectChanges();
 
     const testing = TestBed.inject(HttpTestingController);
-    const req = testing.expectOne(apiPath('sessions/session-1/observe'));
+    const req = testing.expectOne(gatewayPath('sessions/session-1/observe'));
     expect(req.request.method).toBe('POST');
     req.flush({ websocketUrl: 'wss://gateway.test/ws', sessionToken: 'observer-token' });
     await observeFixture.whenStable();
@@ -419,14 +418,14 @@ describe('TerminalPage', () => {
     rejoinFixture.detectChanges();
 
     const testing = TestBed.inject(HttpTestingController);
-    const req = testing.expectOne(apiPath('sessions/session-1/rejoin'));
+    const req = testing.expectOne(gatewayPath('sessions/session-1/rejoin'));
     req.flush({ message: 'Only the original session owner can rejoin' }, { status: 403, statusText: 'Forbidden' });
     await rejoinFixture.whenStable();
 
     expect(rejoinFixture.componentInstance.connectionError).toBe(
       'Only the original session owner can rejoin',
     );
-    testing.expectNone(apiPath('sessions/start'));
+    testing.expectNone(gatewayPath('sessions/start'));
     expect(MockWebSocket.instances.length).toBe(0);
     testing.verify();
   });

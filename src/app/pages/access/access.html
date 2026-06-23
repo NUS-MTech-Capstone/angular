@@ -165,22 +165,22 @@
           [nzNoResult]="noSessionsTemplate">
           <thead>
             <tr>
-              <th>Hostname</th>
-              <th>OS User</th>
+              <th>Host</th>
+              <th>Connection</th>
               <th>CR</th>
-              <th>Started By</th>
-              <th>Started At</th>
+              <th>Owner</th>
+              <th>Created</th>
               <th>Status</th>
-              <th nzWidth="200px">Actions</th>
+              <th nzWidth="160px">Actions</th>
             </tr>
           </thead>
           <tbody>
             <tr *ngFor="let session of sessionsTabTable.data">
-              <td><strong>{{ session.hostname }}</strong></td>
-              <td>{{ session.osUser }}</td>
-              <td>{{ session.crNumber ?? 'Direct' }}</td>
-              <td>{{ session.createdBy }}</td>
-              <td>{{ session.startedAt | date:'dd MMM HH:mm' }}</td>
+              <td><strong>{{ session.hostId }}</strong></td>
+              <td>{{ session.connectionType }}</td>
+              <td>{{ session.crId ? ('CR-' + (session.crId | slice:0:8 | uppercase)) : 'Direct' }}</td>
+              <td>{{ session.userId }}</td>
+              <td>{{ session.createdAt | date:'dd MMM HH:mm' }}</td>
               <td>
                 <nz-tag [nzColor]="sessionStatusColor(session.status)">
                   {{ session.status }}
@@ -193,8 +193,8 @@
                       *nzSpaceItem
                       nz-button
                       nzSize="small"
-                      [disabled]="session.status === 'ended'"
-                      (click)="reconnectBackendSession(session)">
+                      [disabled]="session.status !== 'ACTIVE'"
+                      (click)="reconnectGatewaySession(session)">
                       <span nz-icon nzType="reload" nzTheme="outline"></span>
                       Rejoin
                     </button>
@@ -204,24 +204,12 @@
                       *nzSpaceItem
                       nz-button
                       nzSize="small"
-                      [disabled]="session.status !== 'active' || !can('access.view')"
-                      (click)="observeBackendSession(session)">
+                      [disabled]="session.status !== 'ACTIVE' || !can('access.view')"
+                      (click)="observeGatewaySession(session)">
                       <span nz-icon nzType="eye" nzTheme="outline"></span>
                       Observe
                     </button>
                   </ng-container>
-                  <button
-                    *nzSpaceItem
-                    nz-button
-                    nzType="primary"
-                    nzDanger
-                    nzSize="small"
-                    [disabled]="session.status === 'ended' || !can('access.stop')"
-                    nz-popconfirm
-                    nzPopconfirmTitle="End this session?"
-                    (nzOnConfirm)="endBackendSession(session)">
-                    Stop
-                  </button>
                 </nz-space>
               </td>
             </tr>

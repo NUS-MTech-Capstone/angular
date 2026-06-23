@@ -1,7 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNzIcons } from 'ng-zorro-antd/icon';
 import { of } from 'rxjs';
-import { NzMessageService } from 'ng-zorro-antd/message';
 import { icons } from '../../icons-provider';
 import { ChangeRequestService } from '../../services/change-request.service';
 import { ImplementerGroupService } from '../../services/implementer-group.service';
@@ -15,8 +14,7 @@ describe('Access', () => {
   let changeRequestService: { findAccessible: ReturnType<typeof vi.fn> };
   let implementerGroupService: { findAccessibleVms: ReturnType<typeof vi.fn> };
   let sessionsApi: {
-    listActive: ReturnType<typeof vi.fn>;
-    end: ReturnType<typeof vi.fn>;
+    list: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(async () => {
@@ -29,8 +27,7 @@ describe('Access', () => {
       ),
     };
     sessionsApi = {
-      listActive: vi.fn(() => of([])),
-      end: vi.fn(() => of({ id: 's1', status: 'ended' })),
+      list: vi.fn(() => of({ sessions: [] })),
     };
 
     await TestBed.configureTestingModule({
@@ -40,11 +37,10 @@ describe('Access', () => {
         { provide: ChangeRequestService, useValue: changeRequestService },
         { provide: ImplementerGroupService, useValue: implementerGroupService },
         { provide: SessionsApiService, useValue: sessionsApi },
-        { provide: NzMessageService, useValue: { success: vi.fn(), error: vi.fn() } },
         {
           provide: AuthService,
           useValue: {
-            user: vi.fn(() => ({ username: 'testuser' })),
+            user: vi.fn(() => ({ username: 'testuser', sub: 'user-sub' })),
             hasPermission: vi.fn(() => true),
           },
         },
@@ -67,30 +63,17 @@ describe('Access', () => {
 
   it('loads active sessions when Sessions section is selected', () => {
     component.selectSection('Sessions');
-    expect(sessionsApi.listActive).toHaveBeenCalled();
+    expect(sessionsApi.list).toHaveBeenCalledWith({ status: 'ACTIVE' });
   });
 
   it('identifies sessions owned by the current user', () => {
-    expect(component.isMySession({ createdBy: 'testuser' } as never)).toBe(true);
-    expect(component.isMySession({ createdBy: 'other.user' } as never)).toBe(false);
+    expect(component.isMySession({ userId: 'user-sub' } as never)).toBe(true);
+    expect(component.isMySession({ userId: 'other-user' } as never)).toBe(false);
   });
 
   it('maps session status to tag colors', () => {
-    expect(component.sessionStatusColor('active')).toBe('green');
-    expect(component.sessionStatusColor('disconnected')).toBe('orange');
-    expect(component.sessionStatusColor('ended')).toBe('default');
-  });
-
-  it('ends a backend session via SessionsApiService', () => {
-    const session = {
-      id: 's1',
-      hostname: 'web01',
-      createdBy: 'testuser',
-    } as never;
-
-    component.endBackendSession(session);
-
-    expect(sessionsApi.end).toHaveBeenCalledWith('s1');
+    expect(component.sessionStatusColor('ACTIVE')).toBe('green');
+    expect(component.sessionStatusColor('CLOSED')).toBe('default');
   });
 
   it('opens a terminal window with server and change-request context', () => {
@@ -112,44 +95,46 @@ describe('Access', () => {
     const url = openSpy.mock.calls[0][0] as string;
     expect(url).toContain('user=ec2-user');
     expect(url).toContain('host=host-dev-1');
-    expect(url).toContain('hostId=vm-1');
+    expect(url).toContain('hostId=host-dev-1');
     openSpy.mockRestore();
   });
 
-  it('opens owner rejoin with the DDM session id', () => {
+  it('opens owner rejoin with the gateway session id', () => {
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
 
-    component.reconnectBackendSession({
-      id: 'ddm-session-1',
-      hostId: 'vm-1',
-      hostname: 'host-dev-1',
-      ipAddress: '10.0.10.203',
+    component.reconnectGatewaySession({
+      sessionId: 'gateway-session-1',
+      hostId: 'host-dev-1',
       crId: 'cr-1',
-      crNumber: 'CR-1',
-      osUser: 'ec2-user',
+      connectionType: 'ssh',
+      status: 'ACTIVE',
+      createdAt: '2026-06-18T00:00:00.000Z',
+      lastHeartbeatAt: '2026-06-18T00:01:00.000Z',
+      leaseExpiresAt: '2026-06-18T00:06:00.000Z',
     } as never);
 
     const url = openSpy.mock.calls[0][0] as string;
-    expect(url).toContain('sessionId=ddm-session-1');
+    expect(url).toContain('sessionId=gateway-session-1');
     expect(url).toContain('mode=rejoin');
     openSpy.mockRestore();
   });
 
-  it('opens non-owner observe with the DDM session id', () => {
+  it('opens non-owner observe with the gateway session id', () => {
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
 
-    component.observeBackendSession({
-      id: 'ddm-session-1',
-      hostId: 'vm-1',
-      hostname: 'host-dev-1',
-      ipAddress: '10.0.10.203',
+    component.observeGatewaySession({
+      sessionId: 'gateway-session-1',
+      hostId: 'host-dev-1',
       crId: 'cr-1',
-      crNumber: 'CR-1',
-      osUser: 'ec2-user',
+      connectionType: 'ssh',
+      status: 'ACTIVE',
+      createdAt: '2026-06-18T00:00:00.000Z',
+      lastHeartbeatAt: '2026-06-18T00:01:00.000Z',
+      leaseExpiresAt: '2026-06-18T00:06:00.000Z',
     } as never);
 
     const url = openSpy.mock.calls[0][0] as string;
-    expect(url).toContain('sessionId=ddm-session-1');
+    expect(url).toContain('sessionId=gateway-session-1');
     expect(url).toContain('mode=observe');
     openSpy.mockRestore();
   });

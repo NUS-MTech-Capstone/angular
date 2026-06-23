@@ -21,7 +21,7 @@ import { NzSwitchModule } from 'ng-zorro-antd/switch';
 import { NzTooltipModule } from 'ng-zorro-antd/tooltip';
 import { ITheme, Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
-import { apiPath } from '../../core/api.constants';
+import { gatewayPath } from '../../core/api.constants';
 
 /** Binary terminal protocol — must match proxy-dataplane/internal/protocol/packet.go */
 const enum PktType {
@@ -236,12 +236,12 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
     this.logEvent(`Session requested as ${this.osUser}@${this.ip} (${this.crNumber})`);
 
     if (this.reconnectSessionId) {
-      // UC: Reconnect/Observe Session — ask the backend for a fresh
-      // WebSocket ticket using the DDM session ID from the route.
+      // UC: Reconnect/Observe Session — ask the gateway for a fresh
+      // WebSocket ticket using the gateway session ID from the route.
       const action = this.sessionAccessMode === 'observe' ? 'observe' : 'rejoin';
       this.http
         .post<{ websocketUrl: string; sessionToken: string }>(
-          apiPath(`sessions/${this.reconnectSessionId}/${action}`),
+          gatewayPath(`sessions/${this.reconnectSessionId}/${action}`),
           {},
         )
         .subscribe({
@@ -264,13 +264,10 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
   private startNewSession(): void {
     this.http
       .post<{ websocketUrl: string; sessionToken: string; sessionId: string }>(
-        apiPath('sessions/start'),
+        gatewayPath('sessions/start'),
         {
           hostId: this.hostId,
           crId: this.crId,
-          // osUser is kept for audit logging in the platform DB but is NOT
-          // forwarded to the gateway (per gateway API spec).
-          osUser: this.osUser,
           connectionType: 'ssh',
         },
       )
@@ -342,10 +339,6 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
       const reason = event.reason ? ` (${event.reason})` : '';
       this.writeLine(`\r\n\x1b[33mConnection closed${reason}.\x1b[0m`);
       this.logEvent(`WebSocket closed: code=${event.code}${reason}`);
-      // Notify backend so session state is updated (if not explicitly ended)
-      if (event.code !== 1000) {
-        this.notifyDisconnected();
-      }
       this.cd.detectChanges();
     };
   }
@@ -357,14 +350,6 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
     this.logEvent('Reconnect requested');
     this.connect();
     this.term.focus();
-  }
-
-  /** Called when the WebSocket closes unexpectedly to mark the session disconnected. */
-  private notifyDisconnected(): void {
-    if (!this.reconnectSessionId) return;
-    this.http
-      .patch(apiPath(`sessions/${this.reconnectSessionId}/disconnect`), {})
-      .subscribe({ error: () => {} });
   }
 
   private writeLine(text: string): void {

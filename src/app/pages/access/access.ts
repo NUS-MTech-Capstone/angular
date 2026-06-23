@@ -6,12 +6,10 @@ import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzEmptyModule } from 'ng-zorro-antd/empty';
 import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzInputModule } from 'ng-zorro-antd/input';
-import { NzMessageService } from 'ng-zorro-antd/message';
 import { NzSelectModule } from 'ng-zorro-antd/select';
 import { NzSpaceModule } from 'ng-zorro-antd/space';
 import { NzTableModule } from 'ng-zorro-antd/table';
 import { NzTagModule } from 'ng-zorro-antd/tag';
-import { NzPopconfirmModule } from 'ng-zorro-antd/popconfirm';
 import { NzSpinModule } from 'ng-zorro-antd/spin';
 import { AuthService } from '../../services/auth.service';
 import {
@@ -22,7 +20,7 @@ import {
   ImplementerGroup,
   ImplementerGroupService,
 } from '../../services/implementer-group.service';
-import { SessionsApiService, SessionRecord } from '../../services/sessions.service';
+import { GatewaySession, SessionsApiService } from '../../services/sessions.service';
 import type { VirtualMachine } from '../../services/inventory.service';
 
 interface ActiveSession {
@@ -37,8 +35,9 @@ interface ActiveSession {
   canStop: boolean;
   canWatch: boolean;
   observer: string | null;
-  /** Backend session record ID (undefined for legacy in-memory sessions) */
+  /** Gateway session ID assigned by Proxy Control Plane. */
   sessionId?: string;
+  gatewayHostId: string;
 }
 
 interface AccessServer {
@@ -66,7 +65,6 @@ interface AccessServer {
     NzEmptyModule,
     NzIconModule,
     NzInputModule,
-    NzPopconfirmModule,
     NzSelectModule,
     NzSpinModule,
     NzSpaceModule,
@@ -81,7 +79,6 @@ export class Access implements OnInit {
   private changeRequestService = inject(ChangeRequestService);
   private implementerGroupService = inject(ImplementerGroupService);
   private sessionsApi = inject(SessionsApiService);
-  private message = inject(NzMessageService);
   private cd = inject(ChangeDetectorRef);
 
   sections = ['Servers', 'Change Requests', 'Sessions', 'Proxies'];
@@ -100,8 +97,8 @@ export class Access implements OnInit {
   isLoading = false;
   isLoadingServers = false;
 
-  /** All active sessions from backend (for Sessions tab) */
-  allActiveSessions: SessionRecord[] = [];
+  /** Active sessions from Proxy Control Plane (for Sessions tab). */
+  allActiveSessions: GatewaySession[] = [];
   isLoadingSessions = false;
   sessionStatusFilter: 'active' | 'all' = 'active';
 
@@ -140,8 +137,8 @@ export class Access implements OnInit {
 
   loadAllSessions(): void {
     this.isLoadingSessions = true;
-    this.sessionsApi.listActive().subscribe({
-      next: (sessions) => {
+    this.sessionsApi.list({ status: 'ACTIVE' }).subscribe({
+      next: ({ sessions }) => {
         this.allActiveSessions = sessions;
         this.isLoadingSessions = false;
         // Refresh per-server session lists too
@@ -155,8 +152,8 @@ export class Access implements OnInit {
     });
   }
 
-  private syncServerSessions(backendSessions: SessionRecord[]): void {
-    const byHost = new Map<string, SessionRecord[]>();
+  private syncServerSessions(backendSessions: GatewaySession[]): void {
+    const byHost = new Map<string, GatewaySession[]>();
     for (const s of backendSessions) {
       const list = byHost.get(s.hostId) ?? [];
       list.push(s);
@@ -164,93 +161,87 @@ export class Access implements OnInit {
     }
     // Update groupServers sessions lists
     for (const server of this.groupServers) {
-      const active: ActiveSession[] = (byHost.get(server.vmId) ?? []).map((s) =>
-        this.backendToActiveSession(s),
+      const active: ActiveSession[] = (byHost.get(server.hostname) ?? []).map((s) =>
+        this.gatewayToActiveSession(s, server),
       );
       server.sessions = active;
       this.sessionsByVmId.set(server.vmId, active);
     }
     for (const server of this.crServers) {
-      const active: ActiveSession[] = (byHost.get(server.vmId) ?? []).map((s) =>
-        this.backendToActiveSession(s),
+      const active: ActiveSession[] = (byHost.get(server.hostname) ?? []).map((s) =>
+        this.gatewayToActiveSession(s, server),
       );
       server.sessions = active;
       this.sessionsByVmId.set(server.vmId, active);
     }
   }
 
-  private backendToActiveSession(s: SessionRecord): ActiveSession {
+  private gatewayToActiveSession(s: GatewaySession, server?: AccessServer): ActiveSession {
     return {
-      crNumber: s.crNumber ?? 'Direct',
-      crId: s.crId ?? '',
-      createdBy: s.createdBy,
-      lastActivity: s.lastActivityAt ? new Date(s.lastActivityAt).toLocaleTimeString() : 'Active',
-      osUser: s.osUser,
-      currentImplementor: s.createdBy,
-      primaryAction: s.createdBy === this.currentUser ? 'Rejoin' : 'Observe',
+      crNumber: s.crId ? `CR-${s.crId.slice(0, 8).toUpperCase()}` : 'Direct',
+      crId: s.crId,
+      createdBy: s.userId ?? '',
+      lastActivity: s.lastHeartbeatAt ? new Date(s.lastHeartbeatAt).toLocaleTimeString() : 'Active',
+      osUser: server?.selectedOsUser ?? '',
+      currentImplementor: s.userId ?? '',
+      primaryAction: s.userId === this.auth.user()?.sub ? 'Rejoin' : 'Observe',
       primaryEnabled: true,
-      canStop: true,
+      canStop: false,
       canWatch: true,
       observer: null,
-      sessionId: s.id,
+      sessionId: s.sessionId,
+      gatewayHostId: s.hostId,
     };
   }
 
-  get filteredAllSessions(): SessionRecord[] {
+  get filteredAllSessions(): GatewaySession[] {
     if (this.sessionStatusFilter === 'active') {
-      return this.allActiveSessions.filter((s) => s.status === 'active');
+      return this.allActiveSessions.filter((s) => s.status === 'ACTIVE');
     }
     return this.allActiveSessions;
   }
 
-  isMySession(session: SessionRecord): boolean {
-    return session.createdBy === this.currentUser;
+  isMySession(session: GatewaySession): boolean {
+    return session.userId === this.auth.user()?.sub;
   }
 
   sessionStatusColor(status: string): string {
     switch (status) {
-      case 'active': return 'green';
-      case 'ended': return 'default';
-      case 'disconnected': return 'orange';
+      case 'ACTIVE': return 'green';
+      case 'CLOSED': return 'default';
       default: return 'default';
     }
   }
 
-  endBackendSession(session: SessionRecord): void {
-    this.sessionsApi.end(session.id).subscribe({
-      next: () => {
-        this.message.success(`Session on ${session.hostname} ended`);
-        this.loadAllSessions();
-      },
-      error: (err) =>
-        this.message.error(err?.error?.message ?? 'Failed to end session'),
-    });
+  reconnectGatewaySession(session: GatewaySession): void {
+    this.openGatewaySession(session, 'rejoin');
   }
 
-  reconnectBackendSession(session: SessionRecord): void {
-    this.openBackendSession(session, 'rejoin');
+  observeGatewaySession(session: GatewaySession): void {
+    this.openGatewaySession(session, 'observe');
   }
 
-  observeBackendSession(session: SessionRecord): void {
-    this.openBackendSession(session, 'observe');
-  }
-
-  private openBackendSession(session: SessionRecord, mode: 'rejoin' | 'observe'): void {
+  private openGatewaySession(session: GatewaySession, mode: 'rejoin' | 'observe'): void {
+    const server = this.findServerByGatewayHostId(session.hostId);
     const params = new URLSearchParams({
-      user: session.osUser,
-      host: session.hostname,
-      ip: session.ipAddress ?? '',
-      cr: session.crNumber ?? 'Direct',
+      user: server?.selectedOsUser ?? '',
+      host: server?.hostname ?? session.hostId,
+      ip: server?.ipAddress ?? '',
+      cr: session.crId ? `CR-${session.crId.slice(0, 8).toUpperCase()}` : 'Direct',
       hostId: session.hostId,
-      crId: session.crId ?? '',
-      sessionId: session.id,
+      crId: session.crId,
+      sessionId: session.sessionId,
       mode,
     });
     window.open(`/terminal?${params.toString()}`, '_blank', 'popup=yes,width=1200,height=760');
   }
 
-  joinBackendSession(session: SessionRecord): void {
-    this.observeBackendSession(session);
+  joinBackendSession(session: GatewaySession): void {
+    this.observeGatewaySession(session);
+  }
+
+  private findServerByGatewayHostId(hostId: string): AccessServer | undefined {
+    return [...this.groupServers, ...this.crServers].find((server) => server.hostname === hostId);
   }
 
   private loadAccessibleAssets(): void {
@@ -436,7 +427,7 @@ export class Access implements OnInit {
       host: server.hostname,
       ip: server.ipAddress,
       cr: crLabel,
-      hostId: server.vmId,
+      hostId: server.hostname,
       crId,
     };
     if (sessionId) p['sessionId'] = sessionId;
@@ -453,21 +444,9 @@ export class Access implements OnInit {
   }
 
   stopSession(server: AccessServer, session: ActiveSession): void {
-    if (session.sessionId) {
-      this.sessionsApi.end(session.sessionId).subscribe({
-        next: () => {
-          const sessions = server.sessions.filter((s) => s !== session);
-          server.sessions = sessions;
-          this.sessionsByVmId.set(server.vmId, sessions);
-          this.cd.detectChanges();
-        },
-        error: (err) => this.message.error(err?.error?.message ?? 'Failed to stop session'),
-      });
-    } else {
-      const sessions = server.sessions.filter((s) => s !== session);
-      server.sessions = sessions;
-      this.sessionsByVmId.set(server.vmId, sessions);
-    }
+    const sessions = server.sessions.filter((s) => s !== session);
+    server.sessions = sessions;
+    this.sessionsByVmId.set(server.vmId, sessions);
   }
 
   can(permission: string): boolean {
