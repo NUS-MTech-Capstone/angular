@@ -6,13 +6,13 @@
       <span class="session-cr">{{ crNumber }}</span>
       <span class="session-state">{{ connected ? 'Connected' : 'Disconnected' }}</span>
       <span class="session-mode" *ngIf="isObserverMode">Observer</span>
-      <span
+      <!-- <span
         *ngIf="!isObserverMode"
         class="session-observers"
         nz-tooltip
         [nzTooltipTitle]="observerUserIds().length ? observerUserIds().join(', ') : 'No observers attached'">
         Observers: {{ observerUserIds().length }}
-      </span>
+      </span> -->
     </div>
     <div class="toolbar-actions">
       <button nz-button nzType="text" class="toolbar-btn" nz-tooltip="Copy selection (Ctrl+Shift+C)" (click)="copy()">
