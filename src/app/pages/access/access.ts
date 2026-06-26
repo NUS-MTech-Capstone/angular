@@ -11,6 +11,7 @@ import { NzSpaceModule } from 'ng-zorro-antd/space';
 import { NzTableModule } from 'ng-zorro-antd/table';
 import { NzTagModule } from 'ng-zorro-antd/tag';
 import { NzSpinModule } from 'ng-zorro-antd/spin';
+import { formatChangeRequestNumber } from '../../core/change-request.utils';
 import { AuthService } from '../../services/auth.service';
 import {
   AccessibleChangeRequest,
@@ -189,7 +190,7 @@ export class Access implements OnInit {
 
   private gatewayToActiveSession(s: GatewaySession, server?: AccessServer): ActiveSession {
     return {
-      crNumber: s.crId ? `CR-${s.crId.slice(0, 8).toUpperCase()}` : 'Direct',
+      crNumber: s.crId ? formatChangeRequestNumber(s.crId) : 'Direct',
       crId: s.crId,
       createdBy: s.userId ?? '',
       lastActivity: s.lastHeartbeatAt ? new Date(s.lastHeartbeatAt).toLocaleTimeString() : 'Active',
@@ -237,7 +238,7 @@ export class Access implements OnInit {
       user: server?.selectedOsUser ?? '',
       host: server?.hostname ?? session.hostId,
       ip: server?.ipAddress ?? '',
-      cr: session.crId ? `CR-${session.crId.slice(0, 8).toUpperCase()}` : 'Direct',
+      cr: session.crId ? formatChangeRequestNumber(session.crId) : 'Direct',
       hostId: session.hostId,
       crId: session.crId,
       sessionId: session.sessionId,
@@ -343,7 +344,7 @@ export class Access implements OnInit {
   }
 
   crNumber(request: AccessibleChangeRequest): string {
-    return `CR-${request.id.slice(0, 8).toUpperCase()}`;
+    return formatChangeRequestNumber(request.id);
   }
 
   /** CRs matching the search field text, by CR number, title or requester. */

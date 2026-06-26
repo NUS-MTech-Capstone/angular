@@ -4,7 +4,7 @@ import { WebDriver } from 'selenium-webdriver';
 import { config } from '../config';
 import { AccessPage } from '../pages/access.page';
 import { LoginPage } from '../pages/login.page';
-import { createDriver, quitDriver } from '../support/driver';
+import { createDriver, quitDriver, waitForVisibleText } from '../support/driver';
 
 describe('Access page', () => {
   let driver: WebDriver;
@@ -25,11 +25,11 @@ describe('Access page', () => {
     await quitDriver(driver);
   });
 
-  it('defaults to the Change Requests section', async () => {
-    assert.equal(await accessPage.getActiveSection(), 'Change Requests');
+  it('defaults to the Servers section', async () => {
+    assert.equal(await accessPage.getActiveSection(), 'Servers');
     assert.match(
       await accessPage.getSearchPlaceholder(),
-      /Search change request/i,
+      /Search servers/i,
     );
   });
 
@@ -42,5 +42,6 @@ describe('Access page', () => {
   it('switches to the Sessions section', async () => {
     await accessPage.selectSection('Sessions');
     assert.equal(await accessPage.getActiveSection(), 'Sessions');
+    await waitForVisibleText(driver, '.access-content', 'Active Sessions');
   });
 });

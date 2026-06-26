@@ -1,5 +1,6 @@
 import { By, WebDriver, until } from 'selenium-webdriver';
 import { config } from '../config';
+import { presentationPause } from '../support/driver';
 
 export class AppPage {
   constructor(private readonly driver: WebDriver) {}
@@ -21,6 +22,7 @@ export class AppPage {
       By.xpath(`//li[contains(@class,'rail-item')]//span[contains(@class,'rail-label') and normalize-space()='${label}']/..`),
     );
     await item.click();
+    await presentationPause(`Navigate to ${label}`);
   }
 
   async waitForRoute(pathSuffix: string): Promise<void> {
@@ -39,6 +41,7 @@ export class AppPage {
     );
     await profileItem.click();
     await this.waitForRoute('/profile');
+    await presentationPause('Profile opened');
   }
 
   async logoutFromHeader(): Promise<void> {
@@ -51,6 +54,7 @@ export class AppPage {
       ),
       config.pageLoadTimeoutMs,
     );
+    await this.driver.wait(until.elementIsVisible(logoutItem), config.pageLoadTimeoutMs);
     await logoutItem.click();
     await this.driver.wait(until.urlContains('/login'), config.pageLoadTimeoutMs);
   }

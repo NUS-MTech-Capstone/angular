@@ -17,7 +17,10 @@ describe('Login', () => {
   beforeEach(async () => {
     authService = {
       isAuthenticated: false,
-      getAuthConfig: vi.fn().mockResolvedValue({ mode: 'dev', devUsers: [] }),
+      getAuthConfig: vi.fn().mockResolvedValue({
+        mode: 'dev',
+        devUsers: [{ username: 'admin.dev', name: 'Kei Yam', roles: ['Admin'] }],
+      }),
       devLogin: vi.fn().mockResolvedValue(undefined),
       loginWithAlb: vi.fn(),
     };
@@ -42,5 +45,50 @@ describe('Login', () => {
 
   it('should load dev auth config on init in dev mode', () => {
     expect(authService.getAuthConfig).toHaveBeenCalled();
+    expect(component.devUsers).toEqual([
+      { username: 'admin.dev', name: 'Kei Yam', roles: ['Admin'] },
+    ]);
+  });
+
+  it('redirects authenticated users to Access', async () => {
+    authService.isAuthenticated = true;
+    authService.getAuthConfig.mockClear();
+
+    await component.ngOnInit();
+
+    expect(router.navigate).toHaveBeenCalledWith(['/access']);
+    expect(authService.getAuthConfig).not.toHaveBeenCalled();
+  });
+
+  it('shows a backend error when auth config cannot be loaded', async () => {
+    authService.getAuthConfig.mockRejectedValue(new Error('network down'));
+
+    await component.ngOnInit();
+
+    expect(component.error).toContain('Could not reach the backend');
+  });
+
+  it('signs in with a dev user and navigates to Access', async () => {
+    await component.signInAs('admin.dev');
+
+    expect(authService.devLogin).toHaveBeenCalledWith('admin.dev');
+    expect(router.navigate).toHaveBeenCalledWith(['/access']);
+    expect(component.loadingUser).toBeUndefined();
+  });
+
+  it('shows an error when dev login fails', async () => {
+    authService.devLogin.mockRejectedValue(new Error('401'));
+
+    await component.signInAs('admin.dev');
+
+    expect(component.error).toBe(
+      'Dev login failed. Check that the backend is running.',
+    );
+  });
+
+  it('delegates ALB login to the auth service', () => {
+    component.loginWithAlb();
+
+    expect(authService.loginWithAlb).toHaveBeenCalled();
   });
 });

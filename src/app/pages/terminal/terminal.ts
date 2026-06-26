@@ -4,6 +4,7 @@ import {
   Component,
   ElementRef,
   OnDestroy,
+  signal,
   ViewChild,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
@@ -150,7 +151,8 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
   bellFlash = false;
   isSettingsOpen = false;
   isEventLogOpen = false;
-  observerUserIds: string[] = [];
+  /** Live observer list from dataplane attachment snapshots (0x07 JSON events). */
+  observerUserIds = signal<string[]>([]);
 
   settings: TerminalSettings = { ...DEFAULT_SETTINGS };
   themeOptions = Object.keys(THEMES);
@@ -314,26 +316,7 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
     };
 
     ws.onmessage = (event: MessageEvent) => {
-      const packet = new Uint8Array(event.data as ArrayBuffer);
-      if (packet.length < 1) return;
-
-      const payload = packet.slice(1);
-      switch (packet[0]) {
-        case PktType.Output:
-          if (payload.length > 0) {
-            this.term.write(new TextDecoder().decode(payload));
-          }
-          break;
-        case PktType.Error: {
-          const msg = new TextDecoder().decode(payload);
-          this.writeLine(`\x1b[31m${msg}\x1b[0m`);
-          this.logEvent(`Server error: ${msg}`);
-          break;
-        }
-        case PktType.SessionEvent:
-          this.handleSessionEvent(new TextDecoder().decode(payload));
-          break;
-      }
+      void this.handleWebSocketMessage(event.data);
     };
 
     ws.onerror = () => {
@@ -466,12 +449,51 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
   private handleSessionEvent(message: string): void {
     const attachmentEvent = this.parseAttachmentEvent(message);
     if (attachmentEvent) {
-      this.observerUserIds = attachmentEvent.observers;
-      this.logEvent(`Observers: ${this.observerUserIds.length ? this.observerUserIds.join(', ') : 'none'}`);
+      this.observerUserIds.set(attachmentEvent.observers);
+      const label = attachmentEvent.observers.length
+        ? attachmentEvent.observers.join(', ')
+        : 'none';
+      this.logEvent(`Observers: ${label}`);
       this.cd.detectChanges();
       return;
     }
     this.logEvent(message);
+    this.cd.detectChanges();
+  }
+
+  private async handleWebSocketMessage(data: unknown): Promise<void> {
+    const packet = await this.readPacket(data);
+    if (!packet || packet.length < 1) return;
+
+    const payload = packet.slice(1);
+    switch (packet[0]) {
+      case PktType.Output:
+        if (payload.length > 0) {
+          this.term.write(new TextDecoder().decode(payload));
+        }
+        break;
+      case PktType.Error: {
+        const msg = new TextDecoder().decode(payload);
+        this.writeLine(`\x1b[31m${msg}\x1b[0m`);
+        this.logEvent(`Server error: ${msg}`);
+        this.cd.detectChanges();
+        break;
+      }
+      case PktType.SessionEvent:
+        this.handleSessionEvent(new TextDecoder().decode(payload));
+        break;
+    }
+  }
+
+  /** Normalize WebSocket binary payloads (ArrayBuffer or Blob). */
+  private async readPacket(data: unknown): Promise<Uint8Array | null> {
+    if (data instanceof ArrayBuffer) {
+      return new Uint8Array(data);
+    }
+    if (data instanceof Blob) {
+      return new Uint8Array(await data.arrayBuffer());
+    }
+    return null;
   }
 
   private parseAttachmentEvent(message: string): AttachmentEvent | null {

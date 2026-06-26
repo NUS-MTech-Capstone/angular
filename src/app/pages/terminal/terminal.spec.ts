@@ -205,18 +205,19 @@ describe('TerminalPage', () => {
     expect(new TextDecoder().decode(packet.slice(1))).toBe('ls\r');
   });
 
-  it('writes server output packets to xterm', () => {
+  it('writes server output packets to xterm', async () => {
     const ws = openMockWebSocket();
     const payload = new TextEncoder().encode('hello world');
     const packet = new Uint8Array(1 + payload.length);
     packet[0] = 0x01;
     packet.set(payload, 1);
     ws.onmessage?.({ data: packet.buffer } as MessageEvent);
+    await Promise.resolve();
 
     expect(lastTerm.write).toHaveBeenCalledWith('hello world');
   });
 
-  it('updates observer list from structured session events', () => {
+  it('updates observer list from structured session events', async () => {
     const ws = openMockWebSocket();
     const payload = new TextEncoder().encode(
       JSON.stringify({ type: 'attachments', observers: ['observer-1', 'observer-2'] }),
@@ -225,20 +226,41 @@ describe('TerminalPage', () => {
     packet[0] = 0x07;
     packet.set(payload, 1);
     ws.onmessage?.({ data: packet.buffer } as MessageEvent);
+    await Promise.resolve();
 
-    expect(component.observerUserIds).toEqual(['observer-1', 'observer-2']);
+    expect(component.observerUserIds()).toEqual(['observer-1', 'observer-2']);
     expect(component.eventLog.some((entry) => entry.message.includes('Observers: observer-1, observer-2'))).toBe(
       true,
     );
   });
 
-  it('logs server error packets and writes them to the terminal', () => {
+  it('updates observer count after plain attach text followed by JSON snapshot', async () => {
+    const ws = openMockWebSocket();
+    const textPacket = new Uint8Array([0x07, ...new TextEncoder().encode('observer attached')]);
+    ws.onmessage?.({ data: textPacket.buffer } as MessageEvent);
+    await Promise.resolve();
+    expect(component.observerUserIds()).toEqual([]);
+
+    const snapshot = new TextEncoder().encode(
+      JSON.stringify({ type: 'attachments', observers: ['observer-1'] }),
+    );
+    const snapshotPacket = new Uint8Array(1 + snapshot.length);
+    snapshotPacket[0] = 0x07;
+    snapshotPacket.set(snapshot, 1);
+    ws.onmessage?.({ data: snapshotPacket.buffer } as MessageEvent);
+    await Promise.resolve();
+
+    expect(component.observerUserIds()).toEqual(['observer-1']);
+  });
+
+  it('logs server error packets and writes them to the terminal', async () => {
     const ws = openMockWebSocket();
     const payload = new TextEncoder().encode('permission denied');
     const packet = new Uint8Array(1 + payload.length);
     packet[0] = 0x02;
     packet.set(payload, 1);
     ws.onmessage?.({ data: packet.buffer } as MessageEvent);
+    await Promise.resolve();
 
     expect(lastTerm.writeln).toHaveBeenCalledWith('\x1b[31mpermission denied\x1b[0m');
     expect(component.eventLog.some((entry) => entry.message.includes('Server error'))).toBe(

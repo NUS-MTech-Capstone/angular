@@ -8,7 +8,9 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "test:e2e": "mocha",
-    "test:e2e:headless": "cross-env E2E_HEADLESS=true npm run test:e2e"
+    "test:e2e:headless": "cross-env E2E_HEADLESS=true npm run test:e2e",
+    "test:e2e:record": "cross-env E2E_RECORD=true npm run test:e2e",
+    "test:e2e:presentation": "cross-env E2E_PRESENTATION=true E2E_RECORD=true E2E_HEADLESS=false mocha --no-config --timeout 300000 --require tsx/cjs --require ./e2e/support/setup.ts e2e/specs/presentation.spec.ts"
   },
   "private": true,
   "packageManager": "npm@11.0.0",
@@ -29,9 +31,10 @@
     "@angular/build": "^21.2.7",
     "@angular/cli": "^21.2.7",
     "@angular/compiler-cli": "^21.2.0",
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@types/mocha": "^10.0.10",
     "@vitest/coverage-v8": "^4.1.4",
-    "chromedriver": "^145.0.0",
+    "chromedriver": "^149.0.4",
     "cross-env": "^7.0.3",
     "jsdom": "^28.0.0",
     "less": "^4.2.0",

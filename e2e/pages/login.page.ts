@@ -1,6 +1,6 @@
 import { By, WebDriver } from 'selenium-webdriver';
 import { config } from '../config';
-import { waitForUrlContains, waitForVisibleText } from '../support/driver';
+import { beginRecordingWhenBrowserReady, presentationPause, waitForUrlContains, waitForVisibleText } from '../support/driver';
 
 export class LoginPage {
   constructor(private readonly driver: WebDriver) {}
@@ -8,6 +8,8 @@ export class LoginPage {
   async open(): Promise<void> {
     await this.driver.get(`${config.baseUrl}/login`);
     await waitForVisibleText(this.driver, '.login-brand h1', 'DenDenMushi');
+    await beginRecordingWhenBrowserReady(this.driver);
+    await presentationPause('Login page loaded');
   }
 
   async signInAsDevUser(displayName: string): Promise<void> {
@@ -18,6 +20,7 @@ export class LoginPage {
     );
     await button.click();
     await waitForUrlContains(this.driver, '/access');
+    await presentationPause('Signed in');
   }
 
   async getErrorMessage(): Promise<string | null> {

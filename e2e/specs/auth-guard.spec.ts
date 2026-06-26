@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, it } from 'mocha';
 import { WebDriver } from 'selenium-webdriver';
 import { config } from '../config';
 import { LoginPage } from '../pages/login.page';
-import { createDriver, quitDriver, waitForVisibleText } from '../support/driver';
+import { createDriver, quitDriver, waitForUrlContains, waitForVisibleText } from '../support/driver';
 
 describe('Auth guards', () => {
   let driver: WebDriver;
@@ -38,6 +38,7 @@ describe('Auth guards', () => {
     assert.match(await driver.getCurrentUrl(), /\/access$/);
 
     await driver.get(`${config.baseUrl}/identity`);
+    await waitForUrlContains(driver, '/profile');
     assert.match(await driver.getCurrentUrl(), /\/profile$/);
   });
 });

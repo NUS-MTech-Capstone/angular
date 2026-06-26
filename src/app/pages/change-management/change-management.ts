@@ -23,6 +23,7 @@ import { NzSpinModule } from 'ng-zorro-antd/spin';
 import { NzTooltipModule } from 'ng-zorro-antd/tooltip';
 import { NzMessageService } from 'ng-zorro-antd/message';
 import { ChangeRequestService, ChangeRequest, ChangeRequestModel } from '../../services/change-request.service';
+import { formatChangeRequestNumber } from '../../core/change-request.utils';
 import { AuthService, ALL_ROLES } from '../../services/auth.service';
 import { InventoryService, VirtualMachine } from '../../services/inventory.service';
 import {
@@ -239,7 +240,7 @@ export class ChangeManagement implements OnInit {
   }
 
   crNumber(request: ChangeRequest): string {
-    return `CR-${request.id.slice(0, 8).toUpperCase()}`;
+    return formatChangeRequestNumber(request.id);
   }
 
   vmHostnames(vmIds: string[] | undefined): string[] {
