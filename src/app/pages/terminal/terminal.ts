@@ -301,7 +301,9 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
   }
 
   private openWebSocket(url: string, token: string): void {
-    const wsUrl = `${url}?token=${encodeURIComponent(token)}`;
+    const requestId = crypto.randomUUID();
+    const separator = url.includes('?') ? '&' : '?';
+    const wsUrl = `${url}${separator}token=${encodeURIComponent(token)}&requestId=${encodeURIComponent(requestId)}`;
     const ws = new WebSocket(wsUrl);
     ws.binaryType = 'arraybuffer';
     this.ws = ws;

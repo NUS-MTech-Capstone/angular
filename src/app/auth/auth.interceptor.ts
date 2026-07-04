@@ -9,10 +9,17 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthService);
   const router = inject(Router);
 
-  const isApiRequest = req.url.startsWith(apiBaseUrl);
+  const isPlatformRequest =
+    req.url.startsWith(apiBaseUrl) ||
+    req.url.startsWith('/sessions') ||
+    req.url.startsWith('/incidents');
   const headers: Record<string, string> = {};
 
-  if (isApiRequest) {
+  if (isPlatformRequest) {
+    headers['X-Request-ID'] = crypto.randomUUID();
+  }
+
+  if (req.url.startsWith(apiBaseUrl)) {
     headers[API_VERSION_HEADER] = API_VERSION;
     if (auth.authMode === 'dev' && auth.accessToken) {
       headers['Authorization'] = `Bearer ${auth.accessToken}`;
@@ -29,7 +36,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
       if (
         error instanceof HttpErrorResponse &&
         error.status === 401 &&
-        isApiRequest &&
+        req.url.startsWith(apiBaseUrl) &&
         !req.url.includes('/auth/dev-login')
       ) {
         auth.clearSession();
