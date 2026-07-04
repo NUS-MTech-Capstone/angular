@@ -3,6 +3,11 @@
 Angular web client for the DenDenMushi change-request, inventory, access, user
 administration, and terminal workflows.
 
+In the Phase 1 baseline, Angular uses the authenticated ALB session, same-origin
+webapp APIs, and direct Proxy Control Plane/Proxy Dataplane routes. It does not
+store production bearer tokens and does not proxy terminal traffic through the
+Nest Backend.
+
 ## Authentication And Routing
 
 Production uses the Cognito-authenticated ALB session cookie. The application
