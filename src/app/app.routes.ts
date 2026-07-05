@@ -44,6 +44,12 @@ export const routes: Routes = [
     loadChildren: () => import('./pages/inventory/inventory.routes').then((m) => m.INVENTORY_ROUTES),
   },
   {
+    path: 'agentic-ai',
+    data: { title: 'Agentic AI' },
+    canActivate: [authGuard],
+    loadChildren: () => import('./pages/agentic-ai/agentic-ai.routes').then((m) => m.AGENTIC_AI_ROUTES),
+  },
+  {
     path: 'identity',
     data: { title: 'Identity' },
     canActivate: [authGuard, permissionGuard('identity.users.view')],

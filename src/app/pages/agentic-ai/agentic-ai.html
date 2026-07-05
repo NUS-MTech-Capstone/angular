@@ -1,0 +1,167 @@
+<div class="agent-page">
+  <div class="page-header">
+    <div>
+      <h2>
+        <span nz-icon nzType="robot" nzTheme="outline"></span>
+        Agentic AI
+      </h2>
+    </div>
+    <button nz-button nzType="default" (click)="loadIncidents()" [disabled]="isLoading">
+      <span nz-icon nzType="reload" nzTheme="outline"></span>
+      Refresh
+    </button>
+  </div>
+
+  <div class="summary-strip">
+    <div class="summary-item summary-item--approval">
+      <span class="summary-value">{{ awaitingApprovalCount }}</span>
+      <span class="summary-label">Awaiting approval</span>
+    </div>
+    <div class="summary-item summary-item--running">
+      <span class="summary-value">{{ executingCount }}</span>
+      <span class="summary-label">Executing</span>
+    </div>
+    <div class="summary-item summary-item--failed">
+      <span class="summary-value">{{ failedCount }}</span>
+      <span class="summary-label">Failed</span>
+    </div>
+    <div class="summary-item summary-item--closed">
+      <span class="summary-value">{{ closedCount }}</span>
+      <span class="summary-label">Closed</span>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <nz-select class="state-filter" [(ngModel)]="stateFilter" nzSize="default">
+      <nz-option *ngFor="let option of stateFilters" [nzValue]="option.value" [nzLabel]="option.label"></nz-option>
+    </nz-select>
+    <span class="result-count">{{ filteredIncidents.length }} incidents</span>
+  </div>
+
+  <nz-table
+    #incidentTable
+    [nzData]="filteredIncidents"
+    [nzLoading]="isLoading"
+    [nzShowPagination]="filteredIncidents.length > 10"
+    [nzPageSize]="10"
+    nzSize="small"
+    [nzScroll]="{ x: '980px' }"
+    [nzNoResult]="noIncidents">
+    <thead>
+      <tr>
+        <th>Alarm</th>
+        <th nzWidth="160px">Host</th>
+        <th nzWidth="170px">State</th>
+        <th>Reason</th>
+        <th nzWidth="170px">Updated</th>
+        <th nzWidth="120px">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let incident of incidentTable.data">
+        <td>
+          <button nz-button nzType="link" class="alarm-link" (click)="openIncident(incident)">
+            {{ incident.alarmName }}
+          </button>
+        </td>
+        <td>{{ incident.hostId }}</td>
+        <td>
+          <nz-tag [nzColor]="stateColor(incident.state)">{{ incident.state }}</nz-tag>
+        </td>
+        <td class="reason-cell">{{ incident.reason || '-' }}</td>
+        <td>{{ incident.updatedAt | date: 'short' }}</td>
+        <td>
+          <button nz-button nzSize="small" (click)="openIncident(incident)">
+            <span nz-icon nzType="eye" nzTheme="outline"></span>
+            View
+          </button>
+        </td>
+      </tr>
+    </tbody>
+  </nz-table>
+
+  <ng-template #noIncidents>
+    <nz-empty nzNotFoundContent="No incidents"></nz-empty>
+  </ng-template>
+
+  <nz-drawer
+    [nzVisible]="isDrawerOpen"
+    [nzTitle]="selectedIncident?.alarmName || 'Incident detail'"
+    nzWidth="720px"
+    (nzOnClose)="closeDrawer()">
+    <ng-container *nzDrawerContent>
+      <nz-spin [nzSpinning]="isLoadingDetail">
+        <ng-container *ngIf="selectedIncident as incident">
+          <div class="drawer-actions">
+            <nz-tag [nzColor]="stateColor(incident.state)">{{ incident.state }}</nz-tag>
+            <button
+              nz-button
+              nzType="primary"
+              nzSize="small"
+              *ngIf="canDecideIncident(incident)"
+              [nzLoading]="decidingIncidentId === incident.id"
+              (click)="approveIncident(incident)">
+              <span nz-icon nzType="check-circle" nzTheme="outline"></span>
+              Approve
+            </button>
+            <button
+              nz-button
+              nzDanger
+              nzSize="small"
+              *ngIf="canDecideIncident(incident)"
+              [nzLoading]="decidingIncidentId === incident.id"
+              (click)="rejectIncident(incident)">
+              <span nz-icon nzType="clear" nzTheme="outline"></span>
+              Reject
+            </button>
+          </div>
+
+          <nz-descriptions nzSize="small" [nzColumn]="1" nzBordered>
+            <nz-descriptions-item nzTitle="Incident ID">{{ incident.id }}</nz-descriptions-item>
+            <nz-descriptions-item nzTitle="Host">{{ incident.hostId }}</nz-descriptions-item>
+            <nz-descriptions-item nzTitle="Runbook">{{ incident.runbookVersion || '-' }}</nz-descriptions-item>
+            <nz-descriptions-item nzTitle="Reason">{{ incident.reason || '-' }}</nz-descriptions-item>
+            <nz-descriptions-item nzTitle="Plan hash">
+              <code>{{ incident.planHash || '-' }}</code>
+            </nz-descriptions-item>
+            <nz-descriptions-item nzTitle="Approver">{{ incident.approverSubject || '-' }}</nz-descriptions-item>
+            <nz-descriptions-item nzTitle="Approval">{{ incident.approvalDecision || '-' }}</nz-descriptions-item>
+          </nz-descriptions>
+
+          <section class="detail-section" *ngIf="incident.plan.summary || incident.plan.actions.length">
+            <h3>Proposed plan</h3>
+            <p class="plan-summary">{{ incident.plan.summary || '-' }}</p>
+            <p class="muted">{{ incident.plan.rationale || '-' }}</p>
+            <div class="action-list">
+              <div class="action-row" *ngFor="let action of incident.plan.actions">
+                <code>{{ action.operationId }}</code>
+                <span>{{ action.reason }}</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="detail-section" *ngIf="incident.evidence.length">
+            <h3>Evidence</h3>
+            <div class="evidence-row" *ngFor="let result of incident.evidence">
+              <div class="evidence-header">
+                <code>{{ result.operationId }}</code>
+                <nz-tag [nzColor]="result.exitCode === 0 ? 'green' : 'red'">exit {{ result.exitCode }}</nz-tag>
+              </div>
+              <pre>{{ result.stdout }}{{ result.stderr }}</pre>
+            </div>
+          </section>
+
+          <section class="detail-section" *ngIf="incident.report">
+            <h3>Report</h3>
+            <pre>{{ incident.report }}</pre>
+          </section>
+
+          <section class="detail-section" *ngIf="incident.errorMessage">
+            <h3>Error</h3>
+            <pre class="error-block">{{ incident.errorMessage }}</pre>
+          </section>
+        </ng-container>
+      </nz-spin>
+    </ng-container>
+  </nz-drawer>
+</div>
