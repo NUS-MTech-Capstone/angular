@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ActivatedRoute, provideRouter } from '@angular/router';
 import { provideNzIcons } from 'ng-zorro-antd/icon';
 import { NzMessageService } from 'ng-zorro-antd/message';
 import { NzModalService } from 'ng-zorro-antd/modal';
@@ -28,6 +29,12 @@ const incident = (state: IncidentSummary['state'] = 'AWAITING_APPROVAL'): Incide
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:05:00Z',
   evidence: [{ operationId: 'health_check', stdout: '500', stderr: '', exitCode: 1 }],
+  triage: {
+    priority: 'high',
+    category: 'availability',
+    summary: 'service unhealthy',
+    rationale: 'alarm is in ALARM',
+  },
   plan: {
     summary: 'Restart service',
     rationale: 'Health check failed',
@@ -36,6 +43,8 @@ const incident = (state: IncidentSummary['state'] = 'AWAITING_APPROVAL'): Incide
   approverSubject: '',
   report: '',
   errorMessage: '',
+  postIncidentStatus: '',
+  postIncidentSummary: '',
 });
 
 describe('AgenticAi', () => {
@@ -82,10 +91,12 @@ describe('AgenticAi', () => {
       imports: [AgenticAi],
       providers: [
         provideNzIcons(icons),
+        provideRouter([]),
         { provide: IncidentAgentService, useValue: incidentAgent },
         { provide: AuthService, useValue: auth },
         { provide: NzMessageService, useValue: message },
         { provide: NzModalService, useValue: modal },
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: { get: vi.fn(() => null) } } } },
       ],
     }).compileComponents();
 

@@ -3,13 +3,18 @@
     <div>
       <h2>
         <span nz-icon nzType="robot" nzTheme="outline"></span>
-        Agentic AI
+        Agentic AI incidents
       </h2>
     </div>
     <button nz-button nzType="default" (click)="loadIncidents()" [disabled]="isLoading">
       <span nz-icon nzType="reload" nzTheme="outline"></span>
       Refresh
     </button>
+  </div>
+
+  <div class="section-tabs">
+    <a routerLink="/agentic-ai/alerts" routerLinkActive="active">Alerts</a>
+    <a routerLink="/agentic-ai/incidents" routerLinkActive="active">Incidents</a>
   </div>
 
   <div class="summary-strip">
@@ -128,6 +133,16 @@
             <nz-descriptions-item nzTitle="Approval">{{ incident.approvalDecision || '-' }}</nz-descriptions-item>
           </nz-descriptions>
 
+          <section class="detail-section" *ngIf="incident.triage">
+            <h3>Agent triage</h3>
+            <p class="plan-summary">{{ incident.triage.summary }}</p>
+            <p class="muted">{{ incident.triage.rationale }}</p>
+            <div class="action-row">
+              <code>{{ incident.triage.priority }}</code>
+              <span>{{ incident.triage.category }}</span>
+            </div>
+          </section>
+
           <section class="detail-section" *ngIf="incident.plan.summary || incident.plan.actions.length">
             <h3>Proposed plan</h3>
             <p class="plan-summary">{{ incident.plan.summary || '-' }}</p>
@@ -151,9 +166,12 @@
             </div>
           </section>
 
-          <section class="detail-section" *ngIf="incident.report">
-            <h3>Report</h3>
-            <pre>{{ incident.report }}</pre>
+          <section class="detail-section" *ngIf="incident.postIncidentSummary">
+            <h3>Post-incident summary</h3>
+            <nz-tag *ngIf="incident.postIncidentStatus" [nzColor]="stateColor(incident.state)">
+              {{ incident.postIncidentStatus }}
+            </nz-tag>
+            <pre>{{ incident.postIncidentSummary }}</pre>
           </section>
 
           <section class="detail-section" *ngIf="incident.errorMessage">

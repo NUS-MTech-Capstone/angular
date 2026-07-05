@@ -12,7 +12,8 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const isPlatformRequest =
     req.url.startsWith(apiBaseUrl) ||
     req.url.startsWith('/sessions') ||
-    req.url.startsWith('/incidents');
+    req.url.startsWith('/incidents') ||
+    req.url.startsWith('/alerts');
   const headers: Record<string, string> = {};
 
   if (isPlatformRequest) {

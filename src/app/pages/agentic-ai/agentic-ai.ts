@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, RouterLink, RouterLinkActive } from '@angular/router';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzDescriptionsModule } from 'ng-zorro-antd/descriptions';
 import { NzDrawerModule } from 'ng-zorro-antd/drawer';
@@ -43,6 +44,8 @@ const STATE_FILTERS: { label: string; value: StateFilter }[] = [
   imports: [
     CommonModule,
     FormsModule,
+    RouterLink,
+    RouterLinkActive,
     NzButtonModule,
     NzDescriptionsModule,
     NzDrawerModule,
@@ -74,10 +77,11 @@ export class AgenticAi implements OnInit {
     private auth: AuthService,
     private message: NzMessageService,
     private modal: NzModalService,
+    private route: ActivatedRoute,
   ) {}
 
   ngOnInit(): void {
-    this.loadIncidents();
+    this.loadIncidents(this.route.snapshot.queryParamMap.get('incidentId') ?? undefined);
   }
 
   get canApprove(): boolean {
@@ -109,13 +113,16 @@ export class AgenticAi implements OnInit {
     ).length;
   }
 
-  loadIncidents(): void {
+  loadIncidents(openIncidentId?: string): void {
     this.isLoading = true;
     this.incidentAgent.list().subscribe({
       next: (response) => {
         this.incidents = response.incidents;
         this.isLoading = false;
         this.refreshSelectedSummary();
+        if (openIncidentId) {
+          this.openIncidentById(openIncidentId);
+        }
       },
       error: (error: unknown) => {
         this.isLoading = false;
@@ -125,9 +132,13 @@ export class AgenticAi implements OnInit {
   }
 
   openIncident(incident: IncidentSummary): void {
+    this.openIncidentById(incident.id);
+  }
+
+  openIncidentById(incidentId: string): void {
     this.isDrawerOpen = true;
     this.isLoadingDetail = true;
-    this.incidentAgent.get(incident.id).subscribe({
+    this.incidentAgent.get(incidentId).subscribe({
       next: (detail) => {
         this.selectedIncident = detail;
         this.replaceIncident(detail);
@@ -201,7 +212,7 @@ export class AgenticAi implements OnInit {
         this.decidingIncidentId = '';
         this.message.error(this.errorMessage(error, 'Decision failed'));
         if (error instanceof HttpErrorResponse && error.status === 409) {
-          this.openIncident(incident);
+          this.openIncidentById(incident.id);
         }
       },
     });

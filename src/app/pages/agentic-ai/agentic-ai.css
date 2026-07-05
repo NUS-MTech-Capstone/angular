@@ -27,6 +27,24 @@
   margin-bottom: 16px;
 }
 
+.section-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.section-tabs a {
+  padding: 10px 12px;
+  color: rgba(0, 0, 0, 0.65);
+  border-bottom: 2px solid transparent;
+}
+
+.section-tabs a.active {
+  color: #1677ff;
+  border-bottom-color: #1677ff;
+}
+
 .summary-item {
   display: flex;
   align-items: baseline;
@@ -78,6 +96,14 @@
 
 .state-filter {
   width: 220px;
+}
+
+.compact-filter {
+  width: 150px;
+}
+
+.host-filter {
+  width: 180px;
 }
 
 .result-count {

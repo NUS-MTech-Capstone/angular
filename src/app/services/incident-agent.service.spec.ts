@@ -1,7 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { IncidentAgentService, IncidentDetail, IncidentListResponse } from './incident-agent.service';
+import {
+  AlertListResponse,
+  IncidentAgentService,
+  IncidentDetail,
+  IncidentListResponse,
+  ManagedAlertDetail,
+} from './incident-agent.service';
 
 const incidentDetail = (): IncidentDetail => ({
   id: 'inc-1',
@@ -18,6 +24,12 @@ const incidentDetail = (): IncidentDetail => ({
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:05:00Z',
   evidence: [],
+  triage: {
+    priority: 'high',
+    category: 'availability',
+    summary: 'service unhealthy',
+    rationale: 'alarm is in ALARM',
+  },
   plan: {
     summary: 'Restart service',
     rationale: 'Health check failed',
@@ -26,6 +38,27 @@ const incidentDetail = (): IncidentDetail => ({
   approverSubject: '',
   report: '',
   errorMessage: '',
+  postIncidentStatus: '',
+  postIncidentSummary: '',
+});
+
+const alertDetail = (): ManagedAlertDetail => ({
+  id: 'alert-1',
+  sourceId: 'arn:alarm|2026-01-01T00:00:00Z|ALARM',
+  sourceType: 'managed-server',
+  alarmArn: 'arn:alarm',
+  alarmName: 'High 5xx',
+  cloudwatchState: 'ALARM',
+  hostId: 'host-dev-1',
+  reason: 'threshold breached',
+  status: 'PENDING_APPROVAL',
+  groupKey: 'managed-server|host-dev-1|High 5xx',
+  incidentId: 'inc-1',
+  errorSummary: '',
+  occurredAt: '2026-01-01T00:00:00Z',
+  createdAt: '2026-01-01T00:00:01Z',
+  updatedAt: '2026-01-01T00:05:00Z',
+  incident: incidentDetail(),
 });
 
 describe('IncidentAgentService', () => {
@@ -45,6 +78,32 @@ describe('IncidentAgentService', () => {
   });
 
   afterEach(() => http.verify());
+
+  it('lists alerts with a JSON accept header', () => {
+    let result: AlertListResponse | undefined;
+
+    service.listAlerts().subscribe((response) => (result = response));
+
+    const req = http.expectOne('/alerts');
+    expect(req.request.method).toBe('GET');
+    expect(req.request.headers.get('Accept')).toBe('application/json');
+    req.flush({ alerts: [alertDetail()] });
+
+    expect(result?.alerts[0].status).toBe('PENDING_APPROVAL');
+  });
+
+  it('loads one alert detail', () => {
+    let result: ManagedAlertDetail | undefined;
+
+    service.getAlert('alert-1').subscribe((response) => (result = response));
+
+    const req = http.expectOne('/alerts/alert-1');
+    expect(req.request.method).toBe('GET');
+    expect(req.request.headers.get('Accept')).toBe('application/json');
+    req.flush(alertDetail());
+
+    expect(result?.incident?.id).toBe('inc-1');
+  });
 
   it('lists incidents with a JSON accept header', () => {
     let result: IncidentListResponse | undefined;

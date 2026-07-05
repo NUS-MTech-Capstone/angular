@@ -1,0 +1,156 @@
+<div class="agent-page">
+  <div class="page-header">
+    <div>
+      <h2>
+        <span nz-icon nzType="robot" nzTheme="outline"></span>
+        Managed-server alerts
+      </h2>
+    </div>
+    <button nz-button nzType="default" (click)="loadAlerts()" [disabled]="isLoading">
+      <span nz-icon nzType="reload" nzTheme="outline"></span>
+      Refresh
+    </button>
+  </div>
+
+  <div class="section-tabs">
+    <a routerLink="/agentic-ai/alerts" routerLinkActive="active">Alerts</a>
+    <a routerLink="/agentic-ai/incidents" routerLinkActive="active">Incidents</a>
+  </div>
+
+  <div class="summary-strip">
+    <div class="summary-item summary-item--running">
+      <span class="summary-value">{{ activeCount }}</span>
+      <span class="summary-label">Active</span>
+    </div>
+    <div class="summary-item summary-item--approval">
+      <span class="summary-value">{{ pendingApprovalCount }}</span>
+      <span class="summary-label">Pending approval</span>
+    </div>
+    <div class="summary-item summary-item--closed">
+      <span class="summary-value">{{ resolvedCount }}</span>
+      <span class="summary-label">Resolved</span>
+    </div>
+    <div class="summary-item summary-item--failed">
+      <span class="summary-value">{{ failedCount }}</span>
+      <span class="summary-label">Failed</span>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <nz-select class="state-filter" [(ngModel)]="statusFilter">
+      <nz-option *ngFor="let option of statusFilters" [nzValue]="option.value" [nzLabel]="option.label"></nz-option>
+    </nz-select>
+    <nz-select class="state-filter compact-filter" [(ngModel)]="cloudwatchFilter">
+      <nz-option nzValue="ALL" nzLabel="All states"></nz-option>
+      <nz-option nzValue="ALARM" nzLabel="ALARM"></nz-option>
+      <nz-option nzValue="OK" nzLabel="OK"></nz-option>
+    </nz-select>
+    <input nz-input class="host-filter" [(ngModel)]="hostFilter" placeholder="Filter host" />
+    <span class="result-count">{{ filteredAlerts.length }} alerts</span>
+  </div>
+
+  <nz-table
+    #alertTable
+    [nzData]="filteredAlerts"
+    [nzLoading]="isLoading"
+    [nzShowPagination]="filteredAlerts.length > 10"
+    [nzPageSize]="10"
+    nzSize="small"
+    [nzScroll]="{ x: '1100px' }"
+    [nzNoResult]="noAlerts">
+    <thead>
+      <tr>
+        <th>Alarm</th>
+        <th nzWidth="150px">Host</th>
+        <th nzWidth="120px">State</th>
+        <th nzWidth="170px">Alert status</th>
+        <th>Reason</th>
+        <th nzWidth="170px">Occurred</th>
+        <th nzWidth="130px">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let alert of alertTable.data">
+        <td>
+          <button nz-button nzType="link" class="alarm-link" (click)="openAlert(alert)">
+            {{ alert.alarmName }}
+          </button>
+        </td>
+        <td>{{ alert.hostId }}</td>
+        <td><nz-tag [nzColor]="cloudwatchColor(alert.cloudwatchState)">{{ alert.cloudwatchState }}</nz-tag></td>
+        <td><nz-tag [nzColor]="statusColor(alert.status)">{{ alert.status }}</nz-tag></td>
+        <td class="reason-cell">{{ alert.reason || '-' }}</td>
+        <td>{{ alert.occurredAt | date: 'short' }}</td>
+        <td>
+          <button nz-button nzSize="small" (click)="openAlert(alert)">
+            <span nz-icon nzType="eye" nzTheme="outline"></span>
+            View
+          </button>
+        </td>
+      </tr>
+    </tbody>
+  </nz-table>
+
+  <ng-template #noAlerts>
+    <nz-empty nzNotFoundContent="No managed-server alerts"></nz-empty>
+  </ng-template>
+
+  <nz-drawer
+    [nzVisible]="isDrawerOpen"
+    [nzTitle]="selectedAlert?.alarmName || 'Alert detail'"
+    nzWidth="720px"
+    (nzOnClose)="closeDrawer()">
+    <ng-container *nzDrawerContent>
+      <nz-spin [nzSpinning]="isLoadingDetail">
+        <ng-container *ngIf="selectedAlert as alert">
+          <div class="drawer-actions">
+            <nz-tag [nzColor]="cloudwatchColor(alert.cloudwatchState)">{{ alert.cloudwatchState }}</nz-tag>
+            <nz-tag [nzColor]="statusColor(alert.status)">{{ alert.status }}</nz-tag>
+            <a
+              *ngIf="alert.incidentId"
+              nz-button
+              nzType="primary"
+              nzSize="small"
+              routerLink="/agentic-ai/incidents"
+              [queryParams]="{ incidentId: alert.incidentId }">
+              <span nz-icon nzType="eye" nzTheme="outline"></span>
+              View incident
+            </a>
+          </div>
+
+          <nz-descriptions nzSize="small" [nzColumn]="1" nzBordered>
+            <nz-descriptions-item nzTitle="Alert ID">{{ alert.id }}</nz-descriptions-item>
+            <nz-descriptions-item nzTitle="Host">{{ alert.hostId }}</nz-descriptions-item>
+            <nz-descriptions-item nzTitle="Source">{{ alert.sourceType }}</nz-descriptions-item>
+            <nz-descriptions-item nzTitle="Group key">{{ alert.groupKey }}</nz-descriptions-item>
+            <nz-descriptions-item nzTitle="Incident">{{ alert.incidentId || '-' }}</nz-descriptions-item>
+            <nz-descriptions-item nzTitle="Reason">{{ alert.reason || '-' }}</nz-descriptions-item>
+            <nz-descriptions-item nzTitle="Occurred">{{ alert.occurredAt | date: 'medium' }}</nz-descriptions-item>
+          </nz-descriptions>
+
+          <section class="detail-section" *ngIf="alert.incident?.triage">
+            <h3>Agent triage</h3>
+            <p class="plan-summary">{{ alert.incident?.triage?.summary }}</p>
+            <p class="muted">{{ alert.incident?.triage?.rationale }}</p>
+          </section>
+
+          <section class="detail-section" *ngIf="alert.incident?.plan?.summary">
+            <h3>Action plan</h3>
+            <p class="plan-summary">{{ alert.incident?.plan?.summary }}</p>
+            <p class="muted">{{ alert.incident?.plan?.rationale }}</p>
+          </section>
+
+          <section class="detail-section" *ngIf="alert.incident?.postIncidentSummary">
+            <h3>Post-incident summary</h3>
+            <pre>{{ alert.incident?.postIncidentSummary }}</pre>
+          </section>
+
+          <section class="detail-section" *ngIf="alert.errorSummary">
+            <h3>Error</h3>
+            <pre class="error-block">{{ alert.errorSummary }}</pre>
+          </section>
+        </ng-container>
+      </nz-spin>
+    </ng-container>
+  </nz-drawer>
+</div>
