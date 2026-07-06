@@ -48,7 +48,6 @@ export class App {
     { label: 'Resources', icon: 'cluster', link: '/inventory', permission: 'inventory.view' },
     { label: 'Change Management', icon: 'file-sync', link: '/change-management', permission: 'change.view' },
     { label: 'Agentic AI', icon: 'robot', link: '/agentic-ai/alerts' },
-    { label: 'Monitoring', icon: 'dashboard', link: '/monitoring', permission: 'monitoring.view' },
     { label: 'Audit', icon: 'audit', link: '/audit', permission: 'session-audit.view' },
     { label: 'Identity', icon: 'idcard', link: '/identity', permission: 'identity.users.view' },
   ];

@@ -57,9 +57,8 @@ export const routes: Routes = [
   },
   {
     path: 'monitoring',
-    data: { title: 'Monitoring' },
-    canActivate: [authGuard, permissionGuard('monitoring.view')],
-    loadChildren: () => import('./pages/monitoring/monitoring.routes').then((m) => m.MONITORING_ROUTES),
+    pathMatch: 'full',
+    redirectTo: '/access',
   },
   {
     path: 'audit',

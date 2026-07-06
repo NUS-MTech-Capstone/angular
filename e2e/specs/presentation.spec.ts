@@ -57,10 +57,6 @@ describe('DenDenMushi presentation walkthrough', () => {
     await appPage.waitForRoute('/change-management');
     await presentationScene('Change Management');
 
-    await appPage.navigateViaRail('Monitoring');
-    await appPage.waitForRoute('/monitoring');
-    await presentationScene('Monitoring');
-
     await appPage.navigateViaRail('Identity');
     await appPage.waitForRoute('/identity');
     await presentationScene('Identity');

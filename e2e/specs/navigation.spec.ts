@@ -29,19 +29,16 @@ describe('Navigation', () => {
     assert.equal(await appPage.isNavItemVisible('Access'), true);
     assert.equal(await appPage.isNavItemVisible('Resources'), true);
     assert.equal(await appPage.isNavItemVisible('Change Management'), true);
-    assert.equal(await appPage.isNavItemVisible('Monitoring'), true);
+    assert.equal(await appPage.isNavItemVisible('Monitoring'), false);
     assert.equal(await appPage.isNavItemVisible('Identity'), true);
   });
 
-  it('navigates to Inventory, Change Management, Monitoring, and Identity', async () => {
+  it('navigates to Inventory, Change Management, and Identity', async () => {
     await appPage.navigateViaRail('Resources');
     await appPage.waitForRoute('/inventory');
 
     await appPage.navigateViaRail('Change Management');
     await appPage.waitForRoute('/change-management');
-
-    await appPage.navigateViaRail('Monitoring');
-    await appPage.waitForRoute('/monitoring');
 
     await appPage.navigateViaRail('Identity');
     await appPage.waitForRoute('/identity');
