@@ -53,6 +53,19 @@ const incidentDetail = (): IncidentDetail => ({
       runId: 'run-1',
       planHash: 'hash-1',
     },
+    agents: [
+      {
+        name: 'Evidence Collector Agent',
+        purpose: 'Collect bounded diagnostic evidence from approved operation IDs.',
+        responsibilities: ['Start a bounded automation run.', 'Execute diagnostic operation IDs from the v1 catalog.'],
+        reasoningType: 'deterministic policy',
+        memory: 'incident-local operation results',
+        tools: ['Agent Control Plane automation API', 'STS capability tokens'],
+        inputs: ['incident ID', 'host ID', 'diagnostic operation catalog'],
+        outputs: ['bounded OperationResult list'],
+        handoffTo: 'Action Plan Agent',
+      },
+    ],
     toolDecisions: [
       { operationId: 'target_probe', phase: 'diagnose', chosenBy: 'policy', reason: 'default diagnostic' },
     ],
@@ -203,6 +216,7 @@ describe('IncidentAgentService', () => {
     req.flush(incidentDetail());
 
     expect(result?.plan.actions[0].operationId).toBe('restart_service');
+    expect(result?.explanation.agents[0].name).toBe('Evidence Collector Agent');
     expect(result?.explanation.toolDecisions[0].operationId).toBe('target_probe');
   });
 

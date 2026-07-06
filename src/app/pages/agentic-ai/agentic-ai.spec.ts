@@ -61,6 +61,19 @@ const incident = (state: IncidentSummary['state'] = 'AWAITING_APPROVAL'): Incide
       runId: 'run-1',
       planHash: 'hash-1',
     },
+    agents: [
+      {
+        name: 'Triage Agent',
+        purpose: 'Classify the incident and produce a safe summary.',
+        responsibilities: ['Use sanitized alert context only.', 'Assign priority and category.'],
+        reasoningType: 'Bedrock LLM structured reasoning',
+        memory: 'incident-local prompt context only; no cross-incident memory',
+        tools: ['Bedrock via LangChain'],
+        inputs: ['alarm name', 'host ID', 'sanitized alarm reason'],
+        outputs: ['TriageResult'],
+        handoffTo: 'Evidence Collector Agent',
+      },
+    ],
     toolDecisions: [
       { operationId: 'target_probe', phase: 'diagnose', chosenBy: 'policy', reason: 'default diagnostic' },
     ],
@@ -181,7 +194,23 @@ describe('AgenticAi', () => {
     expect(component.isDrawerOpen).toBe(true);
     expect(component.selectedIncident?.plan.actions[0].operationId).toBe('restart_service');
     expect(component.hasExplanation(component.selectedIncident as IncidentDetail)).toBe(true);
+    expect(component.explanationAgents(component.selectedIncident as IncidentDetail)[0].name).toBe('Triage Agent');
     expect(component.targetProbe(component.selectedIncident as IncidentDetail)?.operationId).toBe('target_probe');
+  });
+
+  it('treats explanation agents as displayable explanation metadata', () => {
+    const detail = incident();
+    detail.explanation.model.plannerType = '';
+    detail.explanation.workflow.catalogVersion = '';
+    detail.explanation.toolDecisions = [];
+    detail.explanation.guardrails = [];
+
+    expect(component.hasExplanation(detail)).toBe(true);
+    expect(component.explanationAgents(detail)).toHaveLength(1);
+
+    detail.explanation.agents = [];
+    expect(component.hasExplanation(detail)).toBe(false);
+    expect(component.explanationAgents(detail)).toEqual([]);
   });
 
   it('shows decisions only to Manager or Admin for awaiting incidents', () => {

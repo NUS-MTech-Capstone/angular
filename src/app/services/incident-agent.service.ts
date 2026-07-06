@@ -145,6 +145,18 @@ export interface ExplanationGuardrail {
   reason: string;
 }
 
+export interface ExplanationAgent {
+  name: string;
+  purpose: string;
+  responsibilities: string[];
+  reasoningType: string;
+  memory: string;
+  tools: string[];
+  inputs: string[];
+  outputs: string[];
+  handoffTo: string;
+}
+
 export interface ExplanationResponsibility {
   modelAdvisory: boolean;
   humanApprovalRequired: boolean;
@@ -156,6 +168,7 @@ export interface ExplanationResponsibility {
 export interface IncidentExplanation {
   model: ExplanationModel;
   workflow: ExplanationWorkflow;
+  agents: ExplanationAgent[];
   toolDecisions: ExplanationToolDecision[];
   guardrails: ExplanationGuardrail[];
   responsibility: ExplanationResponsibility;

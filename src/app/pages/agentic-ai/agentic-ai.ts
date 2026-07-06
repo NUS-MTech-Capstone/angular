@@ -17,6 +17,7 @@ import { NzTableModule } from 'ng-zorro-antd/table';
 import { NzTagModule } from 'ng-zorro-antd/tag';
 import { NzTooltipModule } from 'ng-zorro-antd/tooltip';
 import {
+  ExplanationAgent,
   IncidentAgentService,
   IncidentDetail,
   IncidentState,
@@ -204,9 +205,14 @@ export class AgenticAi implements OnInit {
     return !!(
       explanation?.model?.plannerType ||
       explanation?.workflow?.catalogVersion ||
+      explanation?.agents?.length ||
       explanation?.toolDecisions?.length ||
       explanation?.guardrails?.length
     );
+  }
+
+  explanationAgents(incident: IncidentDetail): ExplanationAgent[] {
+    return incident.explanation?.agents ?? [];
   }
 
   targetProbe(incident: IncidentDetail): OperationResult | undefined {

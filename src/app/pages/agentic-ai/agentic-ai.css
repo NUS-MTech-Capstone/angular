@@ -203,6 +203,77 @@
   background: #fafafa;
 }
 
+.agent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.agent-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.agent-heading,
+.agent-meta,
+.agent-chip-group,
+.agent-flow {
+  display: grid;
+  gap: 10px;
+  align-items: start;
+}
+
+.agent-heading {
+  grid-template-columns: 1fr auto;
+}
+
+.agent-heading p {
+  margin: 4px 0 0;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+.agent-meta,
+.agent-flow {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.agent-meta span,
+.agent-flow div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+.agent-chip-group {
+  grid-template-columns: 70px 1fr;
+  align-items: center;
+}
+
+.agent-chip-label,
+.agent-responsibilities b,
+.agent-meta b,
+.agent-flow b {
+  color: rgba(0, 0, 0, 0.88);
+  font-weight: 600;
+}
+
+.agent-responsibilities ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+.agent-responsibilities li + li {
+  margin-top: 4px;
+}
+
 .evidence-row {
   margin-bottom: 12px;
   padding: 12px;
@@ -309,6 +380,10 @@ pre {
   }
 
   .action-row,
+  .agent-heading,
+  .agent-meta,
+  .agent-chip-group,
+  .agent-flow,
   .timeline-row,
   .audit-row {
     grid-template-columns: 1fr;

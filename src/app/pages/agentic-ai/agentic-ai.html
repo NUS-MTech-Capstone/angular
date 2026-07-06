@@ -163,6 +163,55 @@
             </div>
           </section>
 
+          <section class="detail-section" *ngIf="explanationAgents(incident).length">
+            <h3>Agents</h3>
+            <div class="agent-list">
+              <div class="agent-row" *ngFor="let agent of explanationAgents(incident)">
+                <div class="agent-heading">
+                  <div>
+                    <strong>{{ agent.name }}</strong>
+                    <p>{{ agent.purpose || '-' }}</p>
+                  </div>
+                  <nz-tag>{{ agent.reasoningType || 'unspecified' }}</nz-tag>
+                </div>
+
+                <div class="agent-meta">
+                  <span>
+                    <b>Memory</b>
+                    {{ agent.memory || '-' }}
+                  </span>
+                  <span>
+                    <b>Handoff</b>
+                    {{ agent.handoffTo || '-' }}
+                  </span>
+                </div>
+
+                <div class="agent-chip-group" *ngIf="agent.tools.length">
+                  <span class="agent-chip-label">Tools</span>
+                  <nz-tag *ngFor="let tool of agent.tools">{{ tool }}</nz-tag>
+                </div>
+
+                <div class="agent-flow">
+                  <div>
+                    <b>Inputs</b>
+                    <span>{{ agent.inputs.length ? agent.inputs.join(', ') : '-' }}</span>
+                  </div>
+                  <div>
+                    <b>Outputs</b>
+                    <span>{{ agent.outputs.length ? agent.outputs.join(', ') : '-' }}</span>
+                  </div>
+                </div>
+
+                <div class="agent-responsibilities" *ngIf="agent.responsibilities.length">
+                  <b>Responsibilities</b>
+                  <ul>
+                    <li *ngFor="let responsibility of agent.responsibilities">{{ responsibility }}</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <section class="detail-section" *ngIf="hasExplanation(incident)">
             <h3>Explainability</h3>
             <nz-descriptions nzSize="small" [nzColumn]="1" nzBordered>

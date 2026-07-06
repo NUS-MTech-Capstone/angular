@@ -57,6 +57,19 @@ const incident = (): IncidentDetail => ({
       runId: 'run-1',
       planHash: 'hash-1',
     },
+    agents: [
+      {
+        name: 'Action Plan Agent',
+        purpose: 'Propose a structured remediation plan from bounded evidence.',
+        responsibilities: ['Suggest only operation IDs in structured plan output.'],
+        reasoningType: 'Bedrock LLM structured reasoning',
+        memory: 'incident-local evidence context only; no long-term memory',
+        tools: ['Bedrock via LangChain'],
+        inputs: ['incident metadata', 'bounded diagnostic evidence'],
+        outputs: ['candidate Plan'],
+        handoffTo: 'Action Plan Reviewer Agent',
+      },
+    ],
     toolDecisions: [
       { operationId: 'target_probe', phase: 'diagnose', chosenBy: 'policy', reason: 'default diagnostic' },
     ],
