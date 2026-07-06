@@ -31,6 +31,21 @@
   align-items: center;
 }
 
+.tab-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 12px;
+}
+
+.record-search {
+  grid-template-columns: repeat(7, minmax(120px, 1fr)) auto auto;
+}
+
+.agentic-filters {
+  grid-template-columns: repeat(5, minmax(130px, 1fr)) repeat(2, minmax(150px, 1fr)) auto auto;
+}
+
 .audit-layout {
   display: grid;
   grid-template-columns: minmax(360px, 44%) minmax(420px, 1fr);
@@ -39,7 +54,8 @@
 }
 
 .session-list,
-.record-panel {
+.record-panel,
+.wide-panel {
   min-width: 0;
   border: 1px solid #e4e8f0;
   background: #fff;
@@ -155,6 +171,29 @@
   margin-top: 12px;
 }
 
+.log-body {
+  max-width: 360px;
+}
+
+.log-body code,
+.metadata {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.metadata {
+  max-width: 320px;
+  color: #667085;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+}
+
+.agentic-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
 .session-events {
   margin-top: 18px;
   border-top: 1px solid #e8edf4;
@@ -175,7 +214,13 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .audit-layout {
+  .record-search,
+  .agentic-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .audit-layout,
+  .agentic-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -186,6 +231,11 @@
   }
 
   .filters {
+    grid-template-columns: 1fr;
+  }
+
+  .record-search,
+  .agentic-filters {
     grid-template-columns: 1fr;
   }
 

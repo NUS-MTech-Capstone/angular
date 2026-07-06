@@ -41,6 +41,18 @@ export interface ListSessionAuditRecordsResponse {
   nextCursor?: string;
 }
 
+export interface AuditRecordFilters {
+  sessionId?: string;
+  userId?: string;
+  hostId?: string;
+  crId?: string;
+  recordType?: SessionAuditRecord['recordType'];
+  from?: string;
+  to?: string;
+  limit?: number;
+  cursor?: string;
+}
+
 export interface SessionAuditFilters {
   sessionId?: string;
   userId?: string;
@@ -60,6 +72,11 @@ export class SessionAuditService {
   listSessions(filters: SessionAuditFilters = {}): Observable<ListAuditSessionsResponse> {
     const params = this.toParams(filters);
     return this.http.get<ListAuditSessionsResponse>(`${this.base}/sessions`, { params });
+  }
+
+  listAuditRecords(filters: AuditRecordFilters = {}): Observable<ListSessionAuditRecordsResponse> {
+    const params = this.toParams(filters);
+    return this.http.get<ListSessionAuditRecordsResponse>(`${this.base}/records`, { params });
   }
 
   listRecords(sessionId: string, limit = 500, cursor?: string): Observable<ListSessionAuditRecordsResponse> {

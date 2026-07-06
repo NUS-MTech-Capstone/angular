@@ -100,6 +100,10 @@
           <div class="drawer-actions">
             <nz-tag [nzColor]="stateColor(incident.state)">{{ incident.state }}</nz-tag>
             <nz-tag *ngIf="incident.isPlanExpired" nzColor="red">PLAN EXPIRED</nz-tag>
+            <a nz-button nzSize="small" routerLink="/audit" [queryParams]="sshAuditParams(incident)">
+              <span nz-icon nzType="audit" nzTheme="outline"></span>
+              SSH logs
+            </a>
             <button
               nz-button
               nzType="primary"

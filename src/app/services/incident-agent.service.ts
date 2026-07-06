@@ -71,6 +71,7 @@ export interface ManagedAlertDetail extends ManagedAlert {
 
 export interface AlertListResponse {
   alerts: ManagedAlert[];
+  nextCursor?: string;
 }
 
 export interface IncidentSummary {
@@ -213,6 +214,45 @@ export interface IncidentDetail extends IncidentSummary {
 
 export interface IncidentListResponse {
   incidents: IncidentSummary[];
+  nextCursor?: string;
+}
+
+export interface IncidentEventListResponse {
+  events: IncidentEvent[];
+  nextCursor?: string;
+}
+
+export interface AlertQueryFilters {
+  incidentId?: string;
+  hostId?: string;
+  status?: AlertStatus;
+  cloudwatchState?: CloudWatchState;
+  from?: string;
+  to?: string;
+  limit?: number;
+  cursor?: string;
+}
+
+export interface IncidentQueryFilters {
+  incidentId?: string;
+  alertId?: string;
+  hostId?: string;
+  state?: IncidentState;
+  from?: string;
+  to?: string;
+  limit?: number;
+  cursor?: string;
+}
+
+export interface IncidentEventQueryFilters {
+  incidentId?: string;
+  alertId?: string;
+  eventType?: IncidentEventType;
+  actor?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+  cursor?: string;
 }
 
 export interface AgentHealth {
@@ -234,8 +274,11 @@ export class IncidentAgentService {
   private alertsBase = '/alerts';
   private healthUrl = '/agentic-ai/health';
 
-  listAlerts(): Observable<AlertListResponse> {
-    return this.http.get<AlertListResponse>(this.alertsBase, { headers: JSON_HEADERS });
+  listAlerts(filters: AlertQueryFilters = {}): Observable<AlertListResponse> {
+    return this.http.get<AlertListResponse>(this.alertsBase, {
+      headers: JSON_HEADERS,
+      params: this.toParams(filters),
+    });
   }
 
   getAlert(id: string): Observable<ManagedAlertDetail> {
@@ -246,12 +289,22 @@ export class IncidentAgentService {
     return this.http.get<AgentHealth>(this.healthUrl, { headers: JSON_HEADERS });
   }
 
-  list(): Observable<IncidentListResponse> {
-    return this.http.get<IncidentListResponse>(this.incidentsBase, { headers: JSON_HEADERS });
+  list(filters: IncidentQueryFilters = {}): Observable<IncidentListResponse> {
+    return this.http.get<IncidentListResponse>(this.incidentsBase, {
+      headers: JSON_HEADERS,
+      params: this.toParams(filters),
+    });
   }
 
   get(id: string): Observable<IncidentDetail> {
     return this.http.get<IncidentDetail>(`${this.incidentsBase}/${id}`, { headers: JSON_HEADERS });
+  }
+
+  listEvents(filters: IncidentEventQueryFilters = {}): Observable<IncidentEventListResponse> {
+    return this.http.get<IncidentEventListResponse>(`${this.incidentsBase}/events`, {
+      headers: JSON_HEADERS,
+      params: this.toParams(filters),
+    });
   }
 
   approve(id: string, planHash: string): Observable<IncidentDetail> {
@@ -268,5 +321,15 @@ export class IncidentAgentService {
       { planHash },
       { headers: JSON_HEADERS },
     );
+  }
+
+  private toParams(filters: object): Record<string, string> {
+    const params: Record<string, string> = {};
+    for (const [key, value] of Object.entries(filters)) {
+      if (value !== undefined && value !== '') {
+        params[key] = String(value);
+      }
+    }
+    return params;
   }
 }

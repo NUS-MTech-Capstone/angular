@@ -1,144 +1,385 @@
 <div class="session-audit-page">
   <div class="page-header">
     <div>
-      <h1>Session Audit</h1>
-      <p>Review retained SSH commands and output by session.</p>
+      <h1>Audit</h1>
+      <p>Review retained SSH session audit and Agentic AI metadata events.</p>
     </div>
-    <button nz-button nzType="default" (click)="loadSessions()">
+    <button nz-button nzType="default" (click)="activeTabIndex === 0 ? loadSessions() : loadAgenticAudit()">
       <span nz-icon nzType="reload" nzTheme="outline"></span>
       Refresh
     </button>
   </div>
 
-  <div class="filters">
-    <input nz-input placeholder="Session ID" [(ngModel)]="filters.sessionId" (keyup.enter)="applyFilters()" />
-    <input nz-input placeholder="User ID" [(ngModel)]="filters.userId" (keyup.enter)="applyFilters()" />
-    <input nz-input placeholder="Host ID" [(ngModel)]="filters.hostId" (keyup.enter)="applyFilters()" />
-    <input nz-input placeholder="CR ID" [(ngModel)]="filters.crId" (keyup.enter)="applyFilters()" />
-    <input nz-input type="datetime-local" [(ngModel)]="filters.from" aria-label="From" />
-    <input nz-input type="datetime-local" [(ngModel)]="filters.to" aria-label="To" />
-    <button nz-button nzType="primary" (click)="applyFilters()">
-      <span nz-icon nzType="search" nzTheme="outline"></span>
-      Search
-    </button>
-    <button nz-button nzType="default" (click)="resetFilters()">Reset</button>
-  </div>
-
-  <div class="audit-layout">
-    <section class="session-list">
-      <div class="section-title">Sessions</div>
-      <nz-spin [nzSpinning]="isLoadingSessions">
-        <nz-table
-          #sessionTable
-          nzSize="small"
-          [nzData]="sessions"
-          [nzFrontPagination]="false"
-          [nzShowPagination]="false">
-          <thead>
-            <tr>
-              <th>Session</th>
-              <th>User</th>
-              <th>Host</th>
-              <th>Last Audit</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              *ngFor="let session of sessionTable.data"
-              class="session-row"
-              [class.selected]="selectedSession?.sessionId === session.sessionId"
-              (click)="selectSession(session)">
-              <td>
-                <div class="mono">{{ session.sessionId }}</div>
-                <nz-tag *ngIf="session.truncated" nzColor="orange">TRUNCATED</nz-tag>
-              </td>
-              <td>{{ session.userId }}</td>
-              <td>{{ session.hostId }}</td>
-              <td>{{ session.lastAuditAt | date:'MMM d, HH:mm' }}</td>
-            </tr>
-          </tbody>
-        </nz-table>
-        <nz-empty *ngIf="!isLoadingSessions && sessions.length === 0" nzNotFoundContent="No audited sessions found"></nz-empty>
-      </nz-spin>
-      <button
-        *ngIf="nextSessionCursor"
-        nz-button
-        nzType="default"
-        class="load-more"
-        (click)="loadSessions(nextSessionCursor)">
-        Load more
-      </button>
-    </section>
-
-    <section class="record-panel">
-      <ng-container *ngIf="selectedSession; else noSessionSelected">
-        <div class="record-header">
-          <div>
-            <div class="section-title">Command Timeline</div>
-            <div class="record-subtitle">
-              <span class="mono">{{ selectedSession.sessionId }}</span>
-              <span>{{ selectedSession.userId }}</span>
-              <span>{{ selectedSession.hostId }}</span>
-              <span>{{ selectedSession.crId }}</span>
-            </div>
-          </div>
-          <nz-tag [nzColor]="selectedSession.truncated ? 'orange' : 'green'">
-            {{ selectedSession.truncated ? 'TRUNCATED' : 'RETAINED' }}
-          </nz-tag>
+  <nz-tabs [(nzSelectedIndex)]="activeTabIndex">
+    <nz-tab nzTitle="SSH Sessions">
+      <div class="tab-body">
+        <div class="filters">
+          <input nz-input placeholder="Session ID" [(ngModel)]="filters.sessionId" (keyup.enter)="applyFilters()" />
+          <input nz-input placeholder="User ID" [(ngModel)]="filters.userId" (keyup.enter)="applyFilters()" />
+          <input nz-input placeholder="Host ID" [(ngModel)]="filters.hostId" (keyup.enter)="applyFilters()" />
+          <input nz-input placeholder="CR ID" [(ngModel)]="filters.crId" (keyup.enter)="applyFilters()" />
+          <input nz-input type="datetime-local" [(ngModel)]="filters.from" aria-label="From" />
+          <input nz-input type="datetime-local" [(ngModel)]="filters.to" aria-label="To" />
+          <button nz-button nzType="primary" (click)="applyFilters()">
+            <span nz-icon nzType="search" nzTheme="outline"></span>
+            Search
+          </button>
+          <button nz-button nzType="default" (click)="resetFilters()">Reset</button>
         </div>
 
-        <nz-alert
-          *ngIf="selectedSession.truncated"
-          nzType="warning"
-          nzShowIcon
-          nzMessage="This session reached the audit storage cap; later output may be missing.">
-        </nz-alert>
+        <div class="audit-layout">
+          <section class="session-list">
+            <div class="section-title">Sessions</div>
+            <nz-spin [nzSpinning]="isLoadingSessions">
+              <nz-table
+                #sessionTable
+                nzSize="small"
+                [nzData]="sessions"
+                [nzFrontPagination]="false"
+                [nzShowPagination]="false">
+                <thead>
+                  <tr>
+                    <th>Session</th>
+                    <th>User</th>
+                    <th>Host</th>
+                    <th>Last Audit</th>
+                    <th>Agentic</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    *ngFor="let session of sessionTable.data"
+                    class="session-row"
+                    [class.selected]="selectedSession?.sessionId === session.sessionId"
+                    (click)="selectSession(session)">
+                    <td>
+                      <div class="mono">{{ session.sessionId }}</div>
+                      <nz-tag *ngIf="session.truncated" nzColor="orange">TRUNCATED</nz-tag>
+                    </td>
+                    <td>{{ session.userId }}</td>
+                    <td>{{ session.hostId }}</td>
+                    <td>{{ session.lastAuditAt | date:'MMM d, HH:mm' }}</td>
+                    <td>
+                      <button nz-button nzSize="small" nzType="link" (click)="$event.stopPropagation(); searchAgenticForSession(session)">
+                        Logs
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </nz-table>
+              <nz-empty *ngIf="!isLoadingSessions && sessions.length === 0" nzNotFoundContent="No audited sessions found"></nz-empty>
+            </nz-spin>
+            <button
+              *ngIf="nextSessionCursor"
+              nz-button
+              nzType="default"
+              class="load-more"
+              (click)="loadSessions(nextSessionCursor)">
+              Load more
+            </button>
+          </section>
 
-        <nz-spin [nzSpinning]="isLoadingRecords">
-          <div *ngIf="commandGroups.length > 0; else noRecords" class="timeline">
-            <article class="command-entry" *ngFor="let group of commandGroups">
-              <div class="command-line">
-                <span nz-icon nzType="snippets" nzTheme="outline"></span>
-                <code>{{ group.command.commandText }}</code>
-                <span class="timestamp">{{ group.command.createdAt | date:'HH:mm:ss' }}</span>
+          <section class="record-panel">
+            <ng-container *ngIf="selectedSession; else noSessionSelected">
+              <div class="record-header">
+                <div>
+                  <div class="section-title">Command Timeline</div>
+                  <div class="record-subtitle">
+                    <span class="mono">{{ selectedSession.sessionId }}</span>
+                    <span>{{ selectedSession.userId }}</span>
+                    <span>{{ selectedSession.hostId }}</span>
+                    <span>{{ selectedSession.crId }}</span>
+                  </div>
+                </div>
+                <nz-tag [nzColor]="selectedSession.truncated ? 'orange' : 'green'">
+                  {{ selectedSession.truncated ? 'TRUNCATED' : 'RETAINED' }}
+                </nz-tag>
               </div>
-              <div class="command-meta">
-                <span>{{ outputBytes(group.outputs) }} bytes output</span>
-                <nz-tag *ngIf="hasTruncated(group.outputs)" nzColor="orange">TRUNCATED</nz-tag>
-                <nz-tag *ngIf="group.controls.length > 0" nzColor="red">CONTROL</nz-tag>
+
+              <nz-alert
+                *ngIf="selectedSession.truncated"
+                nzType="warning"
+                nzShowIcon
+                nzMessage="This session reached the audit storage cap; later output may be missing.">
+              </nz-alert>
+
+              <nz-spin [nzSpinning]="isLoadingRecords">
+                <div *ngIf="commandGroups.length > 0; else noRecords" class="timeline">
+                  <article class="command-entry" *ngFor="let group of commandGroups">
+                    <div class="command-line">
+                      <span nz-icon nzType="snippets" nzTheme="outline"></span>
+                      <code>{{ group.command.commandText }}</code>
+                      <span class="timestamp">{{ group.command.createdAt | date:'HH:mm:ss' }}</span>
+                    </div>
+                    <div class="command-meta">
+                      <span>{{ outputBytes(group.outputs) }} bytes output</span>
+                      <nz-tag *ngIf="hasTruncated(group.outputs)" nzColor="orange">TRUNCATED</nz-tag>
+                      <nz-tag *ngIf="group.controls.length > 0" nzColor="red">CONTROL</nz-tag>
+                    </div>
+                    <details class="output-block" [open]="group.outputs.length > 0">
+                      <summary>Output</summary>
+                      <pre>{{ outputText(group.outputs) }}</pre>
+                    </details>
+                  </article>
+                </div>
+                <ng-template #noRecords>
+                  <nz-empty nzNotFoundContent="No audit records retained for this session"></nz-empty>
+                </ng-template>
+              </nz-spin>
+
+              <button
+                *ngIf="nextRecordCursor"
+                nz-button
+                nzType="default"
+                class="load-more"
+                (click)="loadRecords(nextRecordCursor)">
+                Load more records
+              </button>
+
+              <div class="session-events" *ngIf="sessionEvents().length > 0">
+                <div class="section-title">Session Events</div>
+                <div class="event-row" *ngFor="let event of sessionEvents()">
+                  <span>{{ event.createdAt | date:'HH:mm:ss' }}</span>
+                  <span>{{ event.commandText }}</span>
+                </div>
               </div>
-              <details class="output-block" [open]="group.outputs.length > 0">
-                <summary>Output</summary>
-                <pre>{{ outputText(group.outputs) }}</pre>
-              </details>
-            </article>
-          </div>
-          <ng-template #noRecords>
-            <nz-empty nzNotFoundContent="No audit records retained for this session"></nz-empty>
-          </ng-template>
-        </nz-spin>
+            </ng-container>
 
-        <button
-          *ngIf="nextRecordCursor"
-          nz-button
-          nzType="default"
-          class="load-more"
-          (click)="loadRecords(nextRecordCursor)">
-          Load more records
-        </button>
-
-        <div class="session-events" *ngIf="sessionEvents().length > 0">
-          <div class="section-title">Session Events</div>
-          <div class="event-row" *ngFor="let event of sessionEvents()">
-            <span>{{ event.createdAt | date:'HH:mm:ss' }}</span>
-            <span>{{ event.commandText }}</span>
-          </div>
+            <ng-template #noSessionSelected>
+              <nz-empty nzNotFoundContent="Select a session to view command audit"></nz-empty>
+            </ng-template>
+          </section>
         </div>
-      </ng-container>
 
-      <ng-template #noSessionSelected>
-        <nz-empty nzNotFoundContent="Select a session to view command audit"></nz-empty>
-      </ng-template>
-    </section>
-  </div>
+        <section class="wide-panel">
+          <div class="section-title">SSH Record Search</div>
+          <div class="filters record-search">
+            <input nz-input placeholder="Session ID" [(ngModel)]="recordFilters.sessionId" (keyup.enter)="applyRecordFilters()" />
+            <input nz-input placeholder="User ID" [(ngModel)]="recordFilters.userId" (keyup.enter)="applyRecordFilters()" />
+            <input nz-input placeholder="Host ID" [(ngModel)]="recordFilters.hostId" (keyup.enter)="applyRecordFilters()" />
+            <input nz-input placeholder="CR ID" [(ngModel)]="recordFilters.crId" (keyup.enter)="applyRecordFilters()" />
+            <nz-select nzAllowClear nzPlaceHolder="Record type" [(ngModel)]="recordFilters.recordType">
+              <nz-option nzValue="command" nzLabel="Command"></nz-option>
+              <nz-option nzValue="output" nzLabel="Output"></nz-option>
+              <nz-option nzValue="control" nzLabel="Control"></nz-option>
+              <nz-option nzValue="session_event" nzLabel="Session event"></nz-option>
+            </nz-select>
+            <input nz-input type="datetime-local" [(ngModel)]="recordFilters.from" aria-label="Record from" />
+            <input nz-input type="datetime-local" [(ngModel)]="recordFilters.to" aria-label="Record to" />
+            <button nz-button nzType="primary" (click)="applyRecordFilters()">
+              <span nz-icon nzType="search" nzTheme="outline"></span>
+              Search
+            </button>
+            <button nz-button nzType="default" (click)="resetRecordFilters()">Reset</button>
+          </div>
+          <nz-spin [nzSpinning]="isLoadingAuditRecords">
+            <nz-table
+              #recordTable
+              nzSize="small"
+              [nzData]="auditRecords"
+              [nzFrontPagination]="false"
+              [nzShowPagination]="false">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Type</th>
+                  <th>Session</th>
+                  <th>User</th>
+                  <th>Host</th>
+                  <th>Body</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let record of recordTable.data">
+                  <td>{{ record.createdAt | date:'MMM d, HH:mm:ss' }}</td>
+                  <td><nz-tag>{{ record.recordType }}</nz-tag></td>
+                  <td class="mono">{{ record.sessionId }}</td>
+                  <td>{{ record.userId }}</td>
+                  <td>{{ record.hostId }}</td>
+                  <td class="log-body">
+                    <code *ngIf="record.recordType === 'command' || record.recordType === 'session_event'">{{ record.commandText || '-' }}</code>
+                    <span *ngIf="record.recordType === 'output'">{{ record.byteCount }} bytes output</span>
+                    <nz-tag *ngIf="record.truncated" nzColor="orange">TRUNCATED</nz-tag>
+                  </td>
+                </tr>
+              </tbody>
+            </nz-table>
+            <nz-empty *ngIf="!isLoadingAuditRecords && auditRecords.length === 0" nzNotFoundContent="No SSH audit records found"></nz-empty>
+          </nz-spin>
+          <button
+            *ngIf="nextAuditRecordCursor"
+            nz-button
+            nzType="default"
+            class="load-more"
+            (click)="loadAuditRecords(nextAuditRecordCursor)">
+            Load more records
+          </button>
+        </section>
+      </div>
+    </nz-tab>
+
+    <nz-tab nzTitle="Agentic AI">
+      <div class="tab-body">
+        <section class="wide-panel">
+          <div class="section-title">Agentic AI Log Query</div>
+          <div class="filters agentic-filters">
+            <input nz-input placeholder="Incident ID" [(ngModel)]="agentFilters.incidentId" (keyup.enter)="applyAgentFilters()" />
+            <input nz-input placeholder="Alert ID" [(ngModel)]="agentFilters.alertId" (keyup.enter)="applyAgentFilters()" />
+            <input nz-input placeholder="Host ID" [(ngModel)]="agentFilters.hostId" (keyup.enter)="applyAgentFilters()" />
+            <nz-select nzAllowClear nzPlaceHolder="Alert status" [(ngModel)]="agentFilters.alertStatus">
+              <nz-option *ngFor="let status of alertStatuses" [nzValue]="status" [nzLabel]="status"></nz-option>
+            </nz-select>
+            <nz-select nzAllowClear nzPlaceHolder="CloudWatch" [(ngModel)]="agentFilters.cloudwatchState">
+              <nz-option nzValue="ALARM" nzLabel="ALARM"></nz-option>
+              <nz-option nzValue="OK" nzLabel="OK"></nz-option>
+            </nz-select>
+            <nz-select nzAllowClear nzPlaceHolder="Incident state" [(ngModel)]="agentFilters.incidentState">
+              <nz-option *ngFor="let state of incidentStates" [nzValue]="state" [nzLabel]="state"></nz-option>
+            </nz-select>
+            <nz-select nzAllowClear nzPlaceHolder="Event type" [(ngModel)]="agentFilters.eventType">
+              <nz-option *ngFor="let type of eventTypes" [nzValue]="type" [nzLabel]="type"></nz-option>
+            </nz-select>
+            <input nz-input placeholder="Actor" [(ngModel)]="agentFilters.actor" (keyup.enter)="applyAgentFilters()" />
+            <input nz-input type="datetime-local" [(ngModel)]="agentFilters.from" aria-label="Agentic from" />
+            <input nz-input type="datetime-local" [(ngModel)]="agentFilters.to" aria-label="Agentic to" />
+            <button nz-button nzType="primary" (click)="applyAgentFilters()">
+              <span nz-icon nzType="search" nzTheme="outline"></span>
+              Search
+            </button>
+            <button nz-button nzType="default" (click)="resetAgentFilters()">Reset</button>
+          </div>
+        </section>
+
+        <section class="wide-panel">
+          <div class="section-title">Timeline Events</div>
+          <nz-spin [nzSpinning]="isLoadingAgentic">
+            <nz-table
+              #eventTable
+              nzSize="small"
+              [nzData]="agentEvents"
+              [nzFrontPagination]="false"
+              [nzShowPagination]="false">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Event</th>
+                  <th>Incident</th>
+                  <th>Alert</th>
+                  <th>Actor</th>
+                  <th>Message</th>
+                  <th>Metadata</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let event of eventTable.data">
+                  <td>{{ event.createdAt | date:'MMM d, HH:mm:ss' }}</td>
+                  <td><nz-tag>{{ event.eventType }}</nz-tag></td>
+                  <td class="mono">{{ event.incidentId }}</td>
+                  <td class="mono">{{ event.alertId || '-' }}</td>
+                  <td>{{ event.actor || '-' }}</td>
+                  <td>{{ event.message }}</td>
+                  <td class="metadata">{{ metadata(event.metadata) }}</td>
+                </tr>
+              </tbody>
+            </nz-table>
+            <nz-empty *ngIf="!isLoadingAgentic && agentEvents.length === 0" nzNotFoundContent="No Agentic AI events found"></nz-empty>
+          </nz-spin>
+          <button
+            *ngIf="nextAgentEventCursor"
+            nz-button
+            nzType="default"
+            class="load-more"
+            (click)="loadAgenticAudit(nextAgentEventCursor)">
+            Load more events
+          </button>
+        </section>
+
+        <div class="agentic-grid">
+          <section class="wide-panel">
+            <div class="section-title">Alerts</div>
+            <nz-table
+              #alertTable
+              nzSize="small"
+              [nzData]="agentAlerts"
+              [nzFrontPagination]="false"
+              [nzShowPagination]="false">
+              <thead>
+                <tr>
+                  <th>Alert</th>
+                  <th>Host</th>
+                  <th>Status</th>
+                  <th>Occurred</th>
+                  <th>SSH</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let alert of alertTable.data">
+                  <td>
+                    <div>{{ alert.alarmName }}</div>
+                    <div class="mono">{{ alert.id }}</div>
+                  </td>
+                  <td>{{ alert.hostId }}</td>
+                  <td><nz-tag>{{ alert.status }}</nz-tag></td>
+                  <td>{{ alert.occurredAt | date:'MMM d, HH:mm' }}</td>
+                  <td>
+                    <button nz-button nzSize="small" nzType="link" (click)="searchSshForAlert(alert)">SSH logs</button>
+                  </td>
+                </tr>
+              </tbody>
+            </nz-table>
+            <button
+              *ngIf="nextAgentAlertCursor"
+              nz-button
+              nzType="default"
+              class="load-more"
+              (click)="loadAgenticAlerts(nextAgentAlertCursor)">
+              Load more alerts
+            </button>
+          </section>
+
+          <section class="wide-panel">
+            <div class="section-title">Incidents</div>
+            <nz-table
+              #incidentTable
+              nzSize="small"
+              [nzData]="agentIncidents"
+              [nzFrontPagination]="false"
+              [nzShowPagination]="false">
+              <thead>
+                <tr>
+                  <th>Incident</th>
+                  <th>Host</th>
+                  <th>State</th>
+                  <th>Updated</th>
+                  <th>SSH</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let incident of incidentTable.data">
+                  <td>
+                    <div>{{ incident.alarmName || '-' }}</div>
+                    <div class="mono">{{ incident.id }}</div>
+                  </td>
+                  <td>{{ incident.hostId }}</td>
+                  <td><nz-tag>{{ incident.state }}</nz-tag></td>
+                  <td>{{ incident.updatedAt | date:'MMM d, HH:mm' }}</td>
+                  <td>
+                    <button nz-button nzSize="small" nzType="link" (click)="searchSshForIncident(incident)">SSH logs</button>
+                  </td>
+                </tr>
+              </tbody>
+            </nz-table>
+            <button
+              *ngIf="nextAgentIncidentCursor"
+              nz-button
+              nzType="default"
+              class="load-more"
+              (click)="loadAgenticIncidents(nextAgentIncidentCursor)">
+              Load more incidents
+            </button>
+          </section>
+        </div>
+      </div>
+    </nz-tab>
+  </nz-tabs>
 </div>

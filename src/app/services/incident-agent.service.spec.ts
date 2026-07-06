@@ -123,12 +123,12 @@ describe('IncidentAgentService', () => {
 
   afterEach(() => http.verify());
 
-  it('lists alerts with a JSON accept header', () => {
+  it('lists alerts with filters and a JSON accept header', () => {
     let result: AlertListResponse | undefined;
 
-    service.listAlerts().subscribe((response) => (result = response));
+    service.listAlerts({ incidentId: 'inc-1', hostId: 'host-dev-1', status: 'PENDING_APPROVAL', limit: 25 }).subscribe((response) => (result = response));
 
-    const req = http.expectOne('/alerts');
+    const req = http.expectOne('/alerts?incidentId=inc-1&hostId=host-dev-1&status=PENDING_APPROVAL&limit=25');
     expect(req.request.method).toBe('GET');
     expect(req.request.headers.get('Accept')).toBe('application/json');
     req.flush({ alerts: [alertDetail()] });
@@ -170,17 +170,26 @@ describe('IncidentAgentService', () => {
     expect(result?.databaseReady).toBe(true);
   });
 
-  it('lists incidents with a JSON accept header', () => {
+  it('lists incidents with filters and a JSON accept header', () => {
     let result: IncidentListResponse | undefined;
 
-    service.list().subscribe((response) => (result = response));
+    service.list({ alertId: 'alert-1', hostId: 'host-dev-1', state: 'AWAITING_APPROVAL', limit: 25 }).subscribe((response) => (result = response));
 
-    const req = http.expectOne('/incidents');
+    const req = http.expectOne('/incidents?alertId=alert-1&hostId=host-dev-1&state=AWAITING_APPROVAL&limit=25');
     expect(req.request.method).toBe('GET');
     expect(req.request.headers.get('Accept')).toBe('application/json');
     req.flush({ incidents: [incidentDetail()] });
 
     expect(result?.incidents[0].id).toBe('inc-1');
+  });
+
+  it('lists incident events with filters', () => {
+    service.listEvents({ incidentId: 'inc-1', alertId: 'alert-1', eventType: 'PlanApproved', limit: 25 }).subscribe();
+
+    const req = http.expectOne('/incidents/events?incidentId=inc-1&alertId=alert-1&eventType=PlanApproved&limit=25');
+    expect(req.request.method).toBe('GET');
+    expect(req.request.headers.get('Accept')).toBe('application/json');
+    req.flush({ events: [] });
   });
 
   it('loads one incident detail', () => {

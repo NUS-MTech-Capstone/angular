@@ -36,4 +36,12 @@ describe('SessionAuditService', () => {
     expect(req.request.method).toBe('GET');
     req.flush({ records: [] });
   });
+
+  it('lists global audit records with filters', () => {
+    service.listAuditRecords({ hostId: 'host-1', recordType: 'command', limit: 25, cursor: '50' }).subscribe();
+
+    const req = http.expectOne('http://localhost:3000/ddm/session-audit/records?hostId=host-1&recordType=command&limit=25&cursor=50');
+    expect(req.request.method).toBe('GET');
+    req.flush({ records: [] });
+  });
 });

@@ -190,6 +190,15 @@ export class AgenticAiAlerts implements OnInit {
     return value ? 'green' : 'red';
   }
 
+  sshAuditParams(alert: ManagedAlert): Record<string, string> {
+    return {
+      tab: 'ssh',
+      hostId: alert.hostId,
+      from: this.windowIso(alert.occurredAt, -30),
+      to: this.windowIso(alert.occurredAt, 30),
+    };
+  }
+
   private replaceAlert(updated: ManagedAlert): void {
     const index = this.alerts.findIndex((alert) => alert.id === updated.id);
     if (index === -1) {
@@ -215,5 +224,11 @@ export class AgenticAiAlerts implements OnInit {
       return 'Alert not found';
     }
     return error.error?.detail ?? error.message ?? fallback;
+  }
+
+  private windowIso(value: string, offsetMinutes: number): string {
+    const date = new Date(value);
+    const base = Number.isNaN(date.getTime()) ? Date.now() : date.getTime();
+    return new Date(base + offsetMinutes * 60 * 1000).toISOString();
   }
 }

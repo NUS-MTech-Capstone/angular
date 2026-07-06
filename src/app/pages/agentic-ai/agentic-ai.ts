@@ -213,6 +213,15 @@ export class AgenticAi implements OnInit {
     return incident.evidence.find((result) => result.operationId === 'target_probe');
   }
 
+  sshAuditParams(incident: IncidentSummary | IncidentDetail): Record<string, string> {
+    return {
+      tab: 'ssh',
+      hostId: incident.hostId,
+      from: this.windowIso(incident.createdAt, -30),
+      to: this.windowIso(incident.updatedAt, 30),
+    };
+  }
+
   private confirmDecision(decision: Decision, incident: IncidentDetail): void {
     const isApprove = decision === 'approve';
     this.modal.confirm({
@@ -288,5 +297,11 @@ export class AgenticAi implements OnInit {
       return error.error?.detail ?? 'Incident changed; reload before deciding';
     }
     return error.error?.detail ?? error.message ?? fallback;
+  }
+
+  private windowIso(value: string, offsetMinutes: number): string {
+    const date = new Date(value);
+    const base = Number.isNaN(date.getTime()) ? Date.now() : date.getTime();
+    return new Date(base + offsetMinutes * 60 * 1000).toISOString();
   }
 }
