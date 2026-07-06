@@ -28,7 +28,10 @@ const incident = (state: IncidentSummary['state'] = 'AWAITING_APPROVAL'): Incide
   approvalAt: null,
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:05:00Z',
-  evidence: [{ operationId: 'health_check', stdout: '500', stderr: '', exitCode: 1 }],
+  evidence: [
+    { operationId: 'target_probe', stdout: '{"helperReady":true}', stderr: '', exitCode: 0 },
+    { operationId: 'health_check', stdout: '500', stderr: '', exitCode: 1 },
+  ],
   triage: {
     priority: 'high',
     category: 'availability',
@@ -39,6 +42,36 @@ const incident = (state: IncidentSummary['state'] = 'AWAITING_APPROVAL'): Incide
     summary: 'Restart service',
     rationale: 'Health check failed',
     actions: [{ operationId: 'restart_service', reason: 'recover service' }],
+  },
+  explanation: {
+    model: {
+      provider: 'bedrock',
+      plannerType: 'bedrock',
+      modelId: 'global.amazon.nova-2-lite-v1:0',
+      awsRegion: 'ap-southeast-1',
+      temperature: 0,
+      maxPromptBytes: 131072,
+      promptTemplates: { 'plan_system.md.j2': 'hash' },
+    },
+    workflow: {
+      graphVersion: 'v1',
+      catalogVersion: 'v1',
+      diagnosticOperations: ['target_probe', 'health_check'],
+      verificationOperations: ['service_status', 'health_check'],
+      runId: 'run-1',
+      planHash: 'hash-1',
+    },
+    toolDecisions: [
+      { operationId: 'target_probe', phase: 'diagnose', chosenBy: 'policy', reason: 'default diagnostic' },
+    ],
+    guardrails: [{ name: 'catalog_validation', passed: true, reason: 'operation is supported' }],
+    responsibility: {
+      modelAdvisory: true,
+      humanApprovalRequired: true,
+      executionOwner: 'agent-controlplane',
+      tokenIssuer: 'sts',
+      terminalTraffic: 'not handled by incident-agent or agent-controlplane',
+    },
   },
   planExpiresAt: '2026-01-01T00:35:00Z',
   isPlanExpired: false,
@@ -147,6 +180,8 @@ describe('AgenticAi', () => {
     expect(incidentAgent.get).toHaveBeenCalledWith('inc-1');
     expect(component.isDrawerOpen).toBe(true);
     expect(component.selectedIncident?.plan.actions[0].operationId).toBe('restart_service');
+    expect(component.hasExplanation(component.selectedIncident as IncidentDetail)).toBe(true);
+    expect(component.targetProbe(component.selectedIncident as IncidentDetail)?.operationId).toBe('target_probe');
   });
 
   it('shows decisions only to Manager or Admin for awaiting incidents', () => {

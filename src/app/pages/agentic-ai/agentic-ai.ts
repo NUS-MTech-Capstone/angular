@@ -21,6 +21,7 @@ import {
   IncidentDetail,
   IncidentState,
   IncidentSummary,
+  OperationResult,
 } from '../../services/incident-agent.service';
 import { AuthService } from '../../services/auth.service';
 
@@ -196,6 +197,20 @@ export class AgenticAi implements OnInit {
       report.verificationSummary ||
       report.finalState
     );
+  }
+
+  hasExplanation(incident: IncidentDetail): boolean {
+    const explanation = incident.explanation;
+    return !!(
+      explanation?.model?.plannerType ||
+      explanation?.workflow?.catalogVersion ||
+      explanation?.toolDecisions?.length ||
+      explanation?.guardrails?.length
+    );
+  }
+
+  targetProbe(incident: IncidentDetail): OperationResult | undefined {
+    return incident.evidence.find((result) => result.operationId === 'target_probe');
   }
 
   private confirmDecision(decision: Decision, incident: IncidentDetail): void {

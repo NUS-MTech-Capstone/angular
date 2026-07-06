@@ -34,8 +34,12 @@ export type IncidentEventType =
   | 'PlanApproved'
   | 'PlanRejected'
   | 'RemediationStarted'
+  | 'AutomationTokenIssued'
+  | 'OperationExecuted'
   | 'RemediationExecuted'
   | 'RemediationFailed'
+  | 'VerificationOperationExecuted'
+  | 'AutomationRunClosed'
   | 'VerificationPassed'
   | 'VerificationFailed'
   | 'IncidentRecovered';
@@ -108,6 +112,54 @@ export interface OperationResult {
   exitCode: number;
 }
 
+export interface ExplanationModel {
+  provider: string;
+  plannerType: string;
+  modelId: string;
+  awsRegion: string;
+  temperature?: number | null;
+  maxPromptBytes: number;
+  promptTemplates: Record<string, string>;
+}
+
+export interface ExplanationWorkflow {
+  graphVersion: string;
+  catalogVersion: string;
+  diagnosticOperations: string[];
+  verificationOperations: string[];
+  runId: string;
+  planHash: string;
+}
+
+export interface ExplanationToolDecision {
+  operationId: string;
+  phase: string;
+  chosenBy: string;
+  reason: string;
+}
+
+export interface ExplanationGuardrail {
+  name: string;
+  passed: boolean;
+  reason: string;
+}
+
+export interface ExplanationResponsibility {
+  modelAdvisory: boolean;
+  humanApprovalRequired: boolean;
+  executionOwner: string;
+  tokenIssuer: string;
+  terminalTraffic: string;
+}
+
+export interface IncidentExplanation {
+  model: ExplanationModel;
+  workflow: ExplanationWorkflow;
+  toolDecisions: ExplanationToolDecision[];
+  guardrails: ExplanationGuardrail[];
+  responsibility: ExplanationResponsibility;
+}
+
 export interface IncidentEvent {
   id: string;
   incidentId: string;
@@ -146,6 +198,7 @@ export interface IncidentDetail extends IncidentSummary {
   evidence: OperationResult[];
   triage: IncidentTriage | null;
   plan: IncidentPlan;
+  explanation: IncidentExplanation;
   planExpiresAt?: string | null;
   isPlanExpired: boolean;
   approverSubject: string;

@@ -159,6 +159,59 @@
             </div>
           </section>
 
+          <section class="detail-section" *ngIf="hasExplanation(incident)">
+            <h3>Explainability</h3>
+            <nz-descriptions nzSize="small" [nzColumn]="1" nzBordered>
+              <nz-descriptions-item nzTitle="Planner">
+                {{ incident.explanation.model.plannerType || '-' }}
+                <span class="muted-inline">({{ incident.explanation.model.provider || '-' }})</span>
+              </nz-descriptions-item>
+              <nz-descriptions-item nzTitle="Model">
+                {{ incident.explanation.model.modelId || '-' }}
+                <span *ngIf="incident.explanation.model.awsRegion" class="muted-inline">
+                  {{ incident.explanation.model.awsRegion }}
+                </span>
+              </nz-descriptions-item>
+              <nz-descriptions-item nzTitle="Catalog">
+                {{ incident.explanation.workflow.catalogVersion || '-' }}
+              </nz-descriptions-item>
+              <nz-descriptions-item nzTitle="Responsibility">
+                {{ incident.explanation.responsibility.executionOwner || '-' }} issues no model authority;
+                {{ incident.explanation.responsibility.tokenIssuer || '-' }} issues runtime tokens.
+              </nz-descriptions-item>
+              <nz-descriptions-item nzTitle="Terminal traffic">
+                {{ incident.explanation.responsibility.terminalTraffic || '-' }}
+              </nz-descriptions-item>
+            </nz-descriptions>
+
+            <div class="explain-grid" *ngIf="incident.explanation.toolDecisions.length">
+              <div class="explain-row" *ngFor="let decision of incident.explanation.toolDecisions">
+                <code>{{ decision.operationId }}</code>
+                <nz-tag>{{ decision.phase }}</nz-tag>
+                <span>{{ decision.chosenBy }}</span>
+                <span>{{ decision.reason }}</span>
+              </div>
+            </div>
+
+            <div class="guardrail-list" *ngIf="incident.explanation.guardrails.length">
+              <div class="guardrail-row" *ngFor="let guardrail of incident.explanation.guardrails">
+                <nz-tag [nzColor]="guardrail.passed ? 'green' : 'red'">
+                  {{ guardrail.passed ? 'passed' : 'failed' }}
+                </nz-tag>
+                <code>{{ guardrail.name }}</code>
+                <span>{{ guardrail.reason || '-' }}</span>
+              </div>
+            </div>
+
+            <div class="target-probe" *ngIf="targetProbe(incident) as probe">
+              <div class="evidence-header">
+                <code>target_probe</code>
+                <nz-tag [nzColor]="probe.exitCode === 0 ? 'green' : 'red'">exit {{ probe.exitCode }}</nz-tag>
+              </div>
+              <pre>{{ probe.stdout }}{{ probe.stderr }}</pre>
+            </div>
+          </section>
+
           <section class="detail-section" *ngIf="incident.evidence.length">
             <h3>Evidence</h3>
             <div class="evidence-row" *ngFor="let result of incident.evidence">
