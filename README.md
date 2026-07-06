@@ -25,6 +25,9 @@ does not store production bearer or PKCE tokens.
 - Session stop uses `POST /sessions/{gatewaySessionId}/close`.
 - Active session lists use `GET /sessions`.
 - WebSockets connect directly to `/sessions/{sessionId}/ws`.
+- Users with `session-audit.view` can open `/session-audit` to review retained
+  SSH command/output audit fetched from `/ddm/session-audit`; this page is a
+  read-only REST view and never opens a terminal observer WebSocket.
 
 When a production API call returns 401, the client clears its cached profile and
 navigates to the Angular `/login` page. The user explicitly starts the ALB

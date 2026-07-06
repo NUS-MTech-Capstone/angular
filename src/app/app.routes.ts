@@ -61,4 +61,10 @@ export const routes: Routes = [
     canActivate: [authGuard, permissionGuard('monitoring.view')],
     loadChildren: () => import('./pages/monitoring/monitoring.routes').then((m) => m.MONITORING_ROUTES),
   },
+  {
+    path: 'session-audit',
+    data: { title: 'Session Audit' },
+    canActivate: [authGuard, permissionGuard('session-audit.view')],
+    loadChildren: () => import('./pages/session-audit/session-audit.routes').then((m) => m.SESSION_AUDIT_ROUTES),
+  },
 ];
