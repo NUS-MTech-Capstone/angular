@@ -86,6 +86,35 @@
   text-align: right;
 }
 
+.health-panel {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.health-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.health-item span,
+.health-error {
+  color: rgba(0, 0, 0, 0.58);
+  font-size: 12px;
+}
+
+.health-error {
+  grid-column: 1 / -1;
+  padding-top: 8px;
+  color: #cf1322;
+}
+
 .toolbar {
   display: flex;
   align-items: center;
@@ -184,6 +213,37 @@
   gap: 8px;
 }
 
+.timeline-list,
+.audit-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.timeline-row,
+.audit-row {
+  display: grid;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.timeline-row {
+  grid-template-columns: 1fr 130px;
+}
+
+.timeline-row p {
+  margin: 4px 0 0;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+.audit-row {
+  grid-template-columns: minmax(120px, 1fr) 120px minmax(120px, 1fr) 130px;
+}
+
 pre {
   max-height: 260px;
   margin: 8px 0 0;
@@ -204,13 +264,23 @@ pre {
     grid-template-columns: repeat(2, minmax(140px, 1fr));
   }
 
-  .action-row {
+  .health-panel {
+    grid-template-columns: repeat(2, minmax(140px, 1fr));
+  }
+
+  .action-row,
+  .timeline-row,
+  .audit-row {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 520px) {
   .summary-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .health-panel {
     grid-template-columns: 1fr;
   }
 

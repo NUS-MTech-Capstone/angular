@@ -40,11 +40,35 @@ const incident = (state: IncidentSummary['state'] = 'AWAITING_APPROVAL'): Incide
     rationale: 'Health check failed',
     actions: [{ operationId: 'restart_service', reason: 'recover service' }],
   },
+  planExpiresAt: '2026-01-01T00:35:00Z',
+  isPlanExpired: false,
   approverSubject: '',
   report: '',
   errorMessage: '',
   postIncidentStatus: '',
   postIncidentSummary: '',
+  postIncidentReport: {
+    rootCauseSummary: '',
+    actionTaken: '',
+    verificationSummary: '',
+    finalState: '',
+    startedAt: null,
+    resolvedAt: null,
+    durationSeconds: null,
+  },
+  timeline: [
+    {
+      id: 'evt-1',
+      incidentId: 'inc-1',
+      alertId: 'alert-1',
+      eventType: 'PlanProposed',
+      actor: '',
+      message: 'Plan proposed',
+      metadata: {},
+      createdAt: '2026-01-01T00:05:00Z',
+    },
+  ],
+  approvalDecisions: [],
 });
 
 describe('AgenticAi', () => {
@@ -133,6 +157,7 @@ describe('AgenticAi', () => {
 
     auth.hasRole.mockImplementation((role: string) => role === 'Admin');
     expect(component.canDecideIncident(incident('COMPLETED'))).toBe(false);
+    expect(component.canDecideIncident({ ...incident(), isPlanExpired: true })).toBe(false);
   });
 
   it('confirms and approves the selected plan hash', () => {
@@ -181,7 +206,7 @@ describe('AgenticAi', () => {
       throwError(() => new HttpErrorResponse({ status: 409, error: { detail: 'incident changed' } })),
     );
     component.approveIncident(incident());
-    expect(message.error).toHaveBeenCalledWith('Incident changed; reload before deciding');
+    expect(message.error).toHaveBeenCalledWith('incident changed');
     expect(incidentAgent.get).toHaveBeenCalledWith('inc-1');
   });
 });

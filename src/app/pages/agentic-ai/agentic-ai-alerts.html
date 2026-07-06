@@ -6,7 +6,7 @@
         Managed-server alerts
       </h2>
     </div>
-    <button nz-button nzType="default" (click)="loadAlerts()" [disabled]="isLoading">
+    <button nz-button nzType="default" (click)="refresh()" [disabled]="isLoading || isLoadingHealth">
       <span nz-icon nzType="reload" nzTheme="outline"></span>
       Refresh
     </button>
@@ -33,6 +33,36 @@
     <div class="summary-item summary-item--failed">
       <span class="summary-value">{{ failedCount }}</span>
       <span class="summary-label">Failed</span>
+    </div>
+  </div>
+
+  <div class="health-panel" *ngIf="health as currentHealth">
+    <div class="health-item">
+      <span>Database</span>
+      <nz-tag [nzColor]="healthColor(currentHealth.databaseReady)">
+        {{ currentHealth.databaseReady ? 'READY' : 'DOWN' }}
+      </nz-tag>
+    </div>
+    <div class="health-item">
+      <span>Queue consumer</span>
+      <nz-tag [nzColor]="healthColor(currentHealth.queueConsumerConfigured && currentHealth.queueConsumerRunning)">
+        {{ currentHealth.queueConsumerConfigured ? (currentHealth.queueConsumerRunning ? 'RUNNING' : 'STOPPED') : 'DISABLED' }}
+      </nz-tag>
+    </div>
+    <div class="health-item">
+      <span>Last alert</span>
+      <strong>{{ currentHealth.lastAlertProcessedAt ? (currentHealth.lastAlertProcessedAt | date: 'short') : '-' }}</strong>
+    </div>
+    <div class="health-item">
+      <span>Active</span>
+      <strong>{{ currentHealth.activeIncidentCount }}</strong>
+    </div>
+    <div class="health-item">
+      <span>Failed</span>
+      <strong>{{ currentHealth.failedIncidentCount }}</strong>
+    </div>
+    <div class="health-error" *ngIf="currentHealth.lastErrorSummary">
+      {{ currentHealth.lastErrorSummary }}
     </div>
   </div>
 
@@ -123,6 +153,7 @@
             <nz-descriptions-item nzTitle="Host">{{ alert.hostId }}</nz-descriptions-item>
             <nz-descriptions-item nzTitle="Source">{{ alert.sourceType }}</nz-descriptions-item>
             <nz-descriptions-item nzTitle="Group key">{{ alert.groupKey }}</nz-descriptions-item>
+            <nz-descriptions-item nzTitle="Grouped">{{ alert.grouped ? 'Yes' : 'No' }}</nz-descriptions-item>
             <nz-descriptions-item nzTitle="Incident">{{ alert.incidentId || '-' }}</nz-descriptions-item>
             <nz-descriptions-item nzTitle="Reason">{{ alert.reason || '-' }}</nz-descriptions-item>
             <nz-descriptions-item nzTitle="Occurred">{{ alert.occurredAt | date: 'medium' }}</nz-descriptions-item>
@@ -143,6 +174,19 @@
           <section class="detail-section" *ngIf="alert.incident?.postIncidentSummary">
             <h3>Post-incident summary</h3>
             <pre>{{ alert.incident?.postIncidentSummary }}</pre>
+          </section>
+
+          <section class="detail-section" *ngIf="alert.incident?.timeline?.length">
+            <h3>Timeline</h3>
+            <div class="timeline-list">
+              <div class="timeline-row" *ngFor="let event of alert.incident?.timeline">
+                <div>
+                  <strong>{{ event.eventType }}</strong>
+                  <p>{{ event.message || '-' }}</p>
+                </div>
+                <span>{{ event.createdAt | date: 'short' }}</span>
+              </div>
+            </div>
           </section>
 
           <section class="detail-section" *ngIf="alert.errorSummary">

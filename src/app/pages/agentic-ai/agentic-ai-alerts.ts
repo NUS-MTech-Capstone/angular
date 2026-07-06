@@ -15,6 +15,7 @@ import { NzSpinModule } from 'ng-zorro-antd/spin';
 import { NzTableModule } from 'ng-zorro-antd/table';
 import { NzTagModule } from 'ng-zorro-antd/tag';
 import {
+  AgentHealth,
   AlertStatus,
   CloudWatchState,
   IncidentAgentService,
@@ -63,11 +64,13 @@ export class AgenticAiAlerts implements OnInit {
   readonly statusFilters = STATUS_FILTERS;
 
   alerts: ManagedAlert[] = [];
+  health?: AgentHealth;
   selectedAlert?: ManagedAlertDetail;
   statusFilter: AlertStatusFilter = 'ALL';
   cloudwatchFilter: CloudWatchStateFilter = 'ALL';
   hostFilter = '';
   isLoading = false;
+  isLoadingHealth = false;
   isLoadingDetail = false;
   isDrawerOpen = false;
 
@@ -77,6 +80,11 @@ export class AgenticAiAlerts implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    this.refresh();
+  }
+
+  refresh(): void {
+    this.loadHealth();
     this.loadAlerts();
   }
 
@@ -122,6 +130,20 @@ export class AgenticAiAlerts implements OnInit {
     });
   }
 
+  loadHealth(): void {
+    this.isLoadingHealth = true;
+    this.incidentAgent.getHealth().subscribe({
+      next: (health) => {
+        this.health = health;
+        this.isLoadingHealth = false;
+      },
+      error: (error: unknown) => {
+        this.isLoadingHealth = false;
+        this.message.error(this.errorMessage(error, 'Failed to load agent health'));
+      },
+    });
+  }
+
   openAlert(alert: ManagedAlert): void {
     this.isDrawerOpen = true;
     this.isLoadingDetail = true;
@@ -162,6 +184,10 @@ export class AgenticAiAlerts implements OnInit {
 
   cloudwatchColor(state: CloudWatchState): string {
     return state === 'ALARM' ? 'red' : 'green';
+  }
+
+  healthColor(value: boolean): string {
+    return value ? 'green' : 'red';
   }
 
   private replaceAlert(updated: ManagedAlert): void {

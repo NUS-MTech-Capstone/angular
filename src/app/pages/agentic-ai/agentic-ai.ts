@@ -156,7 +156,7 @@ export class AgenticAi implements OnInit {
   }
 
   canDecideIncident(incident: IncidentSummary | IncidentDetail | undefined): boolean {
-    return !!incident && this.canApprove && incident.state === 'AWAITING_APPROVAL';
+    return !!incident && this.canApprove && incident.state === 'AWAITING_APPROVAL' && !this.isExpired(incident);
   }
 
   approveIncident(incident: IncidentDetail): void {
@@ -182,6 +182,20 @@ export class AgenticAi implements OnInit {
       case 'FAILED':
         return 'red';
     }
+  }
+
+  isExpired(incident: IncidentSummary | IncidentDetail): boolean {
+    return 'isPlanExpired' in incident ? incident.isPlanExpired : false;
+  }
+
+  hasStructuredReport(incident: IncidentDetail): boolean {
+    const report = incident.postIncidentReport;
+    return !!(
+      report.rootCauseSummary ||
+      report.actionTaken ||
+      report.verificationSummary ||
+      report.finalState
+    );
   }
 
   private confirmDecision(decision: Decision, incident: IncidentDetail): void {
@@ -256,7 +270,7 @@ export class AgenticAi implements OnInit {
       return 'Incident not found';
     }
     if (error.status === 409) {
-      return 'Incident changed; reload before deciding';
+      return error.error?.detail ?? 'Incident changed; reload before deciding';
     }
     return error.error?.detail ?? error.message ?? fallback;
   }

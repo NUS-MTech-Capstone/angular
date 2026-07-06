@@ -99,6 +99,7 @@
         <ng-container *ngIf="selectedIncident as incident">
           <div class="drawer-actions">
             <nz-tag [nzColor]="stateColor(incident.state)">{{ incident.state }}</nz-tag>
+            <nz-tag *ngIf="incident.isPlanExpired" nzColor="red">PLAN EXPIRED</nz-tag>
             <button
               nz-button
               nzType="primary"
@@ -128,6 +129,9 @@
             <nz-descriptions-item nzTitle="Reason">{{ incident.reason || '-' }}</nz-descriptions-item>
             <nz-descriptions-item nzTitle="Plan hash">
               <code>{{ incident.planHash || '-' }}</code>
+            </nz-descriptions-item>
+            <nz-descriptions-item nzTitle="Plan expiry">
+              {{ incident.planExpiresAt ? (incident.planExpiresAt | date: 'medium') : '-' }}
             </nz-descriptions-item>
             <nz-descriptions-item nzTitle="Approver">{{ incident.approverSubject || '-' }}</nz-descriptions-item>
             <nz-descriptions-item nzTitle="Approval">{{ incident.approvalDecision || '-' }}</nz-descriptions-item>
@@ -166,12 +170,62 @@
             </div>
           </section>
 
-          <section class="detail-section" *ngIf="incident.postIncidentSummary">
-            <h3>Post-incident summary</h3>
-            <nz-tag *ngIf="incident.postIncidentStatus" [nzColor]="stateColor(incident.state)">
-              {{ incident.postIncidentStatus }}
-            </nz-tag>
-            <pre>{{ incident.postIncidentSummary }}</pre>
+          <section class="detail-section" *ngIf="hasStructuredReport(incident) || incident.postIncidentSummary">
+            <h3>Post-incident report</h3>
+            <nz-descriptions *ngIf="hasStructuredReport(incident); else plainReport" nzSize="small" [nzColumn]="1" nzBordered>
+              <nz-descriptions-item nzTitle="Final state">
+                {{ incident.postIncidentReport.finalState || '-' }}
+              </nz-descriptions-item>
+              <nz-descriptions-item nzTitle="Root cause">
+                {{ incident.postIncidentReport.rootCauseSummary || '-' }}
+              </nz-descriptions-item>
+              <nz-descriptions-item nzTitle="Action taken">
+                {{ incident.postIncidentReport.actionTaken || '-' }}
+              </nz-descriptions-item>
+              <nz-descriptions-item nzTitle="Verification">
+                {{ incident.postIncidentReport.verificationSummary || '-' }}
+              </nz-descriptions-item>
+              <nz-descriptions-item nzTitle="Resolved">
+                {{ incident.postIncidentReport.resolvedAt ? (incident.postIncidentReport.resolvedAt | date: 'medium') : '-' }}
+              </nz-descriptions-item>
+              <nz-descriptions-item nzTitle="Duration">
+                {{ incident.postIncidentReport.durationSeconds ?? '-' }}
+              </nz-descriptions-item>
+            </nz-descriptions>
+            <ng-template #plainReport>
+              <nz-tag *ngIf="incident.postIncidentStatus" [nzColor]="stateColor(incident.state)">
+                {{ incident.postIncidentStatus }}
+              </nz-tag>
+              <pre>{{ incident.postIncidentSummary }}</pre>
+            </ng-template>
+          </section>
+
+          <section class="detail-section" *ngIf="incident.timeline.length">
+            <h3>Timeline</h3>
+            <div class="timeline-list">
+              <div class="timeline-row" *ngFor="let event of incident.timeline">
+                <div>
+                  <strong>{{ event.eventType }}</strong>
+                  <p>{{ event.message || '-' }}</p>
+                </div>
+                <span>{{ event.createdAt | date: 'short' }}</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="detail-section" *ngIf="incident.approvalDecisions.length">
+            <h3>Approval audit</h3>
+            <div class="audit-list">
+              <div class="audit-row" *ngFor="let decision of incident.approvalDecisions">
+                <div>
+                  <strong>{{ decision.decision }}</strong>
+                  <span>{{ decision.actor || '-' }}</span>
+                </div>
+                <nz-tag [nzColor]="decision.outcome === 'SUCCEEDED' ? 'green' : 'red'">{{ decision.outcome }}</nz-tag>
+                <code>{{ decision.submittedPlanHash || '-' }}</code>
+                <span>{{ decision.createdAt | date: 'short' }}</span>
+              </div>
+            </div>
           </section>
 
           <section class="detail-section" *ngIf="incident.errorMessage">

@@ -23,6 +23,25 @@ export type AlertStatus =
 
 export type CloudWatchState = 'ALARM' | 'OK';
 
+export type IncidentEventType =
+  | 'AlertReceived'
+  | 'AlertGrouped'
+  | 'IncidentCreated'
+  | 'AgentTriaged'
+  | 'EvidenceCollected'
+  | 'PlanProposed'
+  | 'PlanExpired'
+  | 'PlanApproved'
+  | 'PlanRejected'
+  | 'RemediationStarted'
+  | 'RemediationExecuted'
+  | 'RemediationFailed'
+  | 'VerificationPassed'
+  | 'VerificationFailed'
+  | 'IncidentRecovered';
+
+export type ApprovalOutcome = 'SUCCEEDED' | 'DENIED' | 'CONFLICT' | 'NOT_FOUND';
+
 export interface ManagedAlert {
   id: string;
   sourceId: string;
@@ -35,6 +54,7 @@ export interface ManagedAlert {
   status: AlertStatus;
   groupKey: string;
   incidentId: string;
+  grouped: boolean;
   errorSummary: string;
   occurredAt: string;
   createdAt: string;
@@ -88,21 +108,68 @@ export interface OperationResult {
   exitCode: number;
 }
 
+export interface IncidentEvent {
+  id: string;
+  incidentId: string;
+  alertId: string;
+  eventType: IncidentEventType;
+  actor: string;
+  message: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface ApprovalDecisionAudit {
+  id: string;
+  incidentId: string;
+  actor: string;
+  decision: string;
+  submittedPlanHash: string;
+  outcome: ApprovalOutcome;
+  errorReason: string;
+  createdAt: string;
+}
+
+export interface PostIncidentReport {
+  rootCauseSummary: string;
+  actionTaken: string;
+  verificationSummary: string;
+  finalState: string;
+  startedAt?: string | null;
+  resolvedAt?: string | null;
+  durationSeconds?: number | null;
+}
+
 export interface IncidentDetail extends IncidentSummary {
   sourceId: string;
   alarmArn: string;
   evidence: OperationResult[];
   triage: IncidentTriage | null;
   plan: IncidentPlan;
+  planExpiresAt?: string | null;
+  isPlanExpired: boolean;
   approverSubject: string;
   report: string;
   errorMessage: string;
   postIncidentStatus: string;
   postIncidentSummary: string;
+  postIncidentReport: PostIncidentReport;
+  timeline: IncidentEvent[];
+  approvalDecisions: ApprovalDecisionAudit[];
 }
 
 export interface IncidentListResponse {
   incidents: IncidentSummary[];
+}
+
+export interface AgentHealth {
+  databaseReady: boolean;
+  queueConsumerConfigured: boolean;
+  queueConsumerRunning: boolean;
+  lastAlertProcessedAt?: string | null;
+  lastErrorSummary: string;
+  activeIncidentCount: number;
+  failedIncidentCount: number;
 }
 
 const JSON_HEADERS = new HttpHeaders({ Accept: 'application/json' });
@@ -112,6 +179,7 @@ export class IncidentAgentService {
   private http = inject(HttpClient);
   private incidentsBase = '/incidents';
   private alertsBase = '/alerts';
+  private healthUrl = '/agentic-ai/health';
 
   listAlerts(): Observable<AlertListResponse> {
     return this.http.get<AlertListResponse>(this.alertsBase, { headers: JSON_HEADERS });
@@ -119,6 +187,10 @@ export class IncidentAgentService {
 
   getAlert(id: string): Observable<ManagedAlertDetail> {
     return this.http.get<ManagedAlertDetail>(`${this.alertsBase}/${id}`, { headers: JSON_HEADERS });
+  }
+
+  getHealth(): Observable<AgentHealth> {
+    return this.http.get<AgentHealth>(this.healthUrl, { headers: JSON_HEADERS });
   }
 
   list(): Observable<IncidentListResponse> {

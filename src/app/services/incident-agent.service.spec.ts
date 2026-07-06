@@ -35,11 +35,24 @@ const incidentDetail = (): IncidentDetail => ({
     rationale: 'Health check failed',
     actions: [{ operationId: 'restart_service', reason: 'recover service' }],
   },
+  planExpiresAt: '2026-01-01T00:35:00Z',
+  isPlanExpired: false,
   approverSubject: '',
   report: '',
   errorMessage: '',
   postIncidentStatus: '',
   postIncidentSummary: '',
+  postIncidentReport: {
+    rootCauseSummary: '',
+    actionTaken: '',
+    verificationSummary: '',
+    finalState: '',
+    startedAt: null,
+    resolvedAt: null,
+    durationSeconds: null,
+  },
+  timeline: [],
+  approvalDecisions: [],
 });
 
 const alertDetail = (): ManagedAlertDetail => ({
@@ -54,6 +67,7 @@ const alertDetail = (): ManagedAlertDetail => ({
   status: 'PENDING_APPROVAL',
   groupKey: 'managed-server|host-dev-1|High 5xx',
   incidentId: 'inc-1',
+  grouped: false,
   errorSummary: '',
   occurredAt: '2026-01-01T00:00:00Z',
   createdAt: '2026-01-01T00:00:01Z',
@@ -103,6 +117,27 @@ describe('IncidentAgentService', () => {
     req.flush(alertDetail());
 
     expect(result?.incident?.id).toBe('inc-1');
+  });
+
+  it('loads agent health', () => {
+    let result: { databaseReady: boolean } | undefined;
+
+    service.getHealth().subscribe((response) => (result = response));
+
+    const req = http.expectOne('/agentic-ai/health');
+    expect(req.request.method).toBe('GET');
+    expect(req.request.headers.get('Accept')).toBe('application/json');
+    req.flush({
+      databaseReady: true,
+      queueConsumerConfigured: true,
+      queueConsumerRunning: true,
+      lastAlertProcessedAt: '2026-01-01T00:00:00Z',
+      lastErrorSummary: '',
+      activeIncidentCount: 1,
+      failedIncidentCount: 0,
+    });
+
+    expect(result?.databaseReady).toBe(true);
   });
 
   it('lists incidents with a JSON accept header', () => {

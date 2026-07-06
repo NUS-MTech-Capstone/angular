@@ -39,11 +39,35 @@ const incident = (): IncidentDetail => ({
     rationale: 'Health check failed',
     actions: [{ operationId: 'restart_service', reason: 'recover service' }],
   },
+  planExpiresAt: '2026-01-01T00:35:00Z',
+  isPlanExpired: false,
   approverSubject: '',
   report: '',
   errorMessage: '',
   postIncidentStatus: '',
   postIncidentSummary: '',
+  postIncidentReport: {
+    rootCauseSummary: '',
+    actionTaken: '',
+    verificationSummary: '',
+    finalState: '',
+    startedAt: null,
+    resolvedAt: null,
+    durationSeconds: null,
+  },
+  timeline: [
+    {
+      id: 'evt-1',
+      incidentId: 'inc-1',
+      alertId: 'alert-1',
+      eventType: 'AlertGrouped',
+      actor: '',
+      message: 'Alert grouped',
+      metadata: {},
+      createdAt: '2026-01-01T00:05:00Z',
+    },
+  ],
+  approvalDecisions: [],
 });
 
 const alert = (status: ManagedAlert['status'] = 'PENDING_APPROVAL'): ManagedAlertDetail => ({
@@ -58,6 +82,7 @@ const alert = (status: ManagedAlert['status'] = 'PENDING_APPROVAL'): ManagedAler
   status,
   groupKey: 'managed-server|host-dev-1|High 5xx',
   incidentId: 'inc-1',
+  grouped: false,
   errorSummary: '',
   occurredAt: '2026-01-01T00:00:00Z',
   createdAt: '2026-01-01T00:00:01Z',
@@ -71,6 +96,7 @@ describe('AgenticAiAlerts', () => {
   let incidentAgent: {
     listAlerts: ReturnType<typeof vi.fn>;
     getAlert: ReturnType<typeof vi.fn>;
+    getHealth: ReturnType<typeof vi.fn>;
   };
   let message: {
     error: ReturnType<typeof vi.fn>;
@@ -80,6 +106,17 @@ describe('AgenticAiAlerts', () => {
     incidentAgent = {
       listAlerts: vi.fn(() => of({ alerts: [alert()] })),
       getAlert: vi.fn(() => of(alert())),
+      getHealth: vi.fn(() =>
+        of({
+          databaseReady: true,
+          queueConsumerConfigured: true,
+          queueConsumerRunning: true,
+          lastAlertProcessedAt: '2026-01-01T00:00:00Z',
+          lastErrorSummary: '',
+          activeIncidentCount: 1,
+          failedIncidentCount: 0,
+        }),
+      ),
     };
     message = {
       error: vi.fn(),
@@ -103,6 +140,7 @@ describe('AgenticAiAlerts', () => {
 
   it('loads alerts and computes status counts', () => {
     expect(component.alerts).toHaveLength(1);
+    expect(component.health?.databaseReady).toBe(true);
     expect(component.pendingApprovalCount).toBe(1);
 
     component.alerts = [alert('RECEIVED'), alert('RESOLVED'), alert('FAILED')];
@@ -132,6 +170,7 @@ describe('AgenticAiAlerts', () => {
     expect(incidentAgent.getAlert).toHaveBeenCalledWith('alert-1');
     expect(component.isDrawerOpen).toBe(true);
     expect(component.selectedAlert?.incident?.plan.summary).toBe('Restart service');
+    expect(component.selectedAlert?.incident?.timeline[0].eventType).toBe('AlertGrouped');
   });
 
   it('reports alert load errors', () => {
@@ -142,5 +181,16 @@ describe('AgenticAiAlerts', () => {
     component.openAlert(alert());
 
     expect(message.error).toHaveBeenCalledWith('Alert not found');
+  });
+
+  it('reports health errors without clearing alerts', () => {
+    incidentAgent.getHealth.mockReturnValueOnce(
+      throwError(() => new HttpErrorResponse({ status: 503, error: { detail: 'service is not ready' } })),
+    );
+
+    component.loadHealth();
+
+    expect(component.alerts).toHaveLength(1);
+    expect(message.error).toHaveBeenCalledWith('service is not ready');
   });
 });

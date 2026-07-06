@@ -13,7 +13,8 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     req.url.startsWith(apiBaseUrl) ||
     req.url.startsWith('/sessions') ||
     req.url.startsWith('/incidents') ||
-    req.url.startsWith('/alerts');
+    req.url.startsWith('/alerts') ||
+    req.url.startsWith('/agentic-ai/health');
   const headers: Record<string, string> = {};
 
   if (isPlatformRequest) {
