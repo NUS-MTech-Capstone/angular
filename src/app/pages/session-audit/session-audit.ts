@@ -30,6 +30,7 @@ import {
   SessionAuditRecord,
   SessionAuditService,
 } from '../../services/session-audit.service';
+import { formatChangeRequestNumber } from '../../core/change-request.utils';
 
 interface CommandGroup {
   id: string;
@@ -67,7 +68,7 @@ interface AuditRecordSearchRow {
 const SESSION_RECORD_LIMIT = 100;
 const DEFAULT_RECORD_TYPE: SessionAuditRecord['recordType'] | '' = '';
 const EMPTY_OUTPUT = 'No readable output retained for this record.';
-const ORPHAN_OUTPUT_SEQUENCE_GAP = 1;
+const ORPHAN_OUTPUT_SEQUENCE_GAP = 4;
 
 function defaultRecordFilters(): RecordFilters {
   return {
@@ -477,7 +478,7 @@ export class SessionAudit implements OnInit {
         command: {
           ...visibleOrphanOutputs[0],
           recordType: 'command',
-          commandText: 'Unassociated session output',
+          commandText: 'Terminal output',
           commandId: 'startup-output',
         },
         outputs: visibleOrphanOutputs,
@@ -660,6 +661,29 @@ export class SessionAudit implements OnInit {
     return this.userDisplayBySub.get(userId) ?? userId;
   }
 
+  compactId(value: string, visibleChars = 11): string {
+    if (!value || value.length <= visibleChars + 3) {
+      return value;
+    }
+    return `${value.slice(0, visibleChars)}...`;
+  }
+
+  copyValue(value: string, event?: Event): void {
+    event?.stopPropagation();
+    if (!value) {
+      return;
+    }
+    const clipboard = navigator.clipboard;
+    if (!clipboard?.writeText) {
+      this.message.error('Clipboard is not available');
+      return;
+    }
+    void clipboard.writeText(value).then(
+      () => this.message.success('Copied to clipboard'),
+      () => this.message.error('Failed to copy value'),
+    );
+  }
+
   sessionStatusColor(status: string): string {
     switch (status) {
       case 'ACTIVE':
@@ -674,18 +698,18 @@ export class SessionAudit implements OnInit {
   recordTypeLabel(recordType: SessionAuditRecord['recordType']): string {
     switch (recordType) {
       case 'command':
-        return 'Command';
+        return 'Commands';
       case 'output':
         return 'Terminal output';
       case 'control':
-        return 'Control';
+        return 'Controls';
       case 'session_event':
-        return 'Session lifecycle';
+        return 'Session events';
     }
   }
 
   crLabel(crId: string): string {
-    return crId || 'Direct';
+    return crId ? formatChangeRequestNumber(crId) : 'Direct';
   }
 
   rowBodyPreview(row: AuditRecordSearchRow): string {

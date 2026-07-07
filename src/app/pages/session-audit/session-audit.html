@@ -40,7 +40,13 @@
                   <div class="session-card-header">
                     <div class="session-card-title">
                       <strong>{{ displayUser(session.userId) }}</strong>
-                      <span class="mono compact-id" [title]="session.sessionId">{{ session.sessionId }}</span>
+                      <button
+                        type="button"
+                        class="copy-chip mono"
+                        [title]="session.sessionId"
+                        (click)="copyValue(session.sessionId, $event)">
+                        {{ compactId(session.sessionId) }}
+                      </button>
                     </div>
                     <div class="session-card-actions">
                       <nz-tag [nzColor]="sessionStatusColor(session.status)">{{ session.status }}</nz-tag>
@@ -53,7 +59,17 @@
                   <div class="session-card-meta">
                     <div>
                       <span class="meta-label">CR ID</span>
-                      <span class="meta-value mono" [title]="session.crId">{{ crLabel(session.crId) }}</span>
+                      <button
+                        *ngIf="session.crId; else directSessionCr"
+                        type="button"
+                        class="copy-chip meta-copy mono"
+                        [title]="session.crId"
+                        (click)="copyValue(session.crId, $event)">
+                        {{ crLabel(session.crId) }}
+                      </button>
+                      <ng-template #directSessionCr>
+                        <span class="meta-value mono">Direct</span>
+                      </ng-template>
                     </div>
                     <div>
                       <span class="meta-label">Host</span>
@@ -95,11 +111,27 @@
               <div class="record-header">
                 <div>
                   <div class="section-title">Command Timeline</div>
-                  <div class="record-subtitle">
-                    <span class="mono">{{ selectedSession.sessionId }}</span>
-                    <span>{{ displayUser(selectedSession.userId) }}</span>
-                    <span>{{ selectedSession.hostId }}</span>
-                    <span>{{ crLabel(selectedSession.crId) }}</span>
+                  <div class="context-chip-row">
+                    <button
+                      type="button"
+                      class="context-chip mono"
+                      [title]="selectedSession.sessionId"
+                      (click)="copyValue(selectedSession.sessionId, $event)">
+                      Session {{ compactId(selectedSession.sessionId) }}
+                    </button>
+                    <button
+                      *ngIf="selectedSession.crId; else directTimelineCr"
+                      type="button"
+                      class="context-chip mono"
+                      [title]="selectedSession.crId"
+                      (click)="copyValue(selectedSession.crId, $event)">
+                      {{ crLabel(selectedSession.crId) }}
+                    </button>
+                    <ng-template #directTimelineCr>
+                      <span class="context-chip mono">Direct</span>
+                    </ng-template>
+                    <span class="context-chip">{{ displayUser(selectedSession.userId) }}</span>
+                    <span class="context-chip">{{ selectedSession.hostId }}</span>
                   </div>
                 </div>
                 <nz-tag [nzColor]="selectedSession.truncated ? 'orange' : 'green'">
@@ -190,10 +222,10 @@
             <input nz-input placeholder="CR ID" [(ngModel)]="recordFilters.crId" (keyup.enter)="applyRecordFilters()" />
             <nz-select nzAllowClear nzPlaceHolder="Record type" [(ngModel)]="recordFilters.recordType">
               <nz-option nzValue="" nzLabel="All"></nz-option>
-              <nz-option nzValue="command" nzLabel="Commands"></nz-option>
               <nz-option nzValue="output" nzLabel="Terminal output"></nz-option>
+              <nz-option nzValue="command" nzLabel="Commands"></nz-option>
+              <nz-option nzValue="session_event" nzLabel="Session events"></nz-option>
               <nz-option nzValue="control" nzLabel="Controls"></nz-option>
-              <nz-option nzValue="session_event" nzLabel="Session lifecycle"></nz-option>
             </nz-select>
             <input nz-input type="datetime-local" [(ngModel)]="recordFilters.from" aria-label="Record from" />
             <input nz-input type="datetime-local" [(ngModel)]="recordFilters.to" aria-label="Record to" />
@@ -203,6 +235,7 @@
             </button>
             <button nz-button nzType="default" (click)="resetRecordFilters()">Reset</button>
           </div>
+          <div class="filter-hint">Older retained sessions may only have terminal output records.</div>
           <nz-spin [nzSpinning]="isLoadingAuditRecords">
             <nz-table
               #recordTable
@@ -227,12 +260,24 @@
                   <td>{{ row.primary.createdAt | date:'MMM d, HH:mm:ss' }}</td>
                   <td><nz-tag>{{ recordTypeLabel(row.primary.recordType) }}</nz-tag></td>
                   <td class="record-session-cell">
-                    <div class="mono compact-id">{{ row.primary.sessionId }}</div>
+                    <button
+                      type="button"
+                      class="copy-chip mono"
+                      [title]="row.primary.sessionId"
+                      (click)="copyValue(row.primary.sessionId, $event)">
+                      {{ compactId(row.primary.sessionId) }}
+                    </button>
                     <div class="record-context">{{ rowSequenceContext(row) }}</div>
                   </td>
                   <td>
                     <div>{{ displayUser(row.primary.userId) }}</div>
-                    <div class="muted compact-id">{{ row.primary.userId }}</div>
+                    <button
+                      type="button"
+                      class="copy-chip muted mono"
+                      [title]="row.primary.userId"
+                      (click)="copyValue(row.primary.userId, $event)">
+                      {{ compactId(row.primary.userId) }}
+                    </button>
                   </td>
                   <td>{{ row.primary.hostId }}</td>
                   <td class="log-body">

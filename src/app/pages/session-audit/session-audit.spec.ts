@@ -23,7 +23,7 @@ describe('SessionAudit', () => {
   };
   let identityService: { listUsers: ReturnType<typeof vi.fn> };
   let authService: { hasPermission: ReturnType<typeof vi.fn> };
-  let message: { error: ReturnType<typeof vi.fn> };
+  let message: { error: ReturnType<typeof vi.fn>; success: ReturnType<typeof vi.fn> };
   let route: { snapshot: { queryParamMap: { get: ReturnType<typeof vi.fn> } } };
   let router: { navigate: ReturnType<typeof vi.fn> };
 
@@ -109,7 +109,7 @@ describe('SessionAudit', () => {
     authService = {
       hasPermission: vi.fn(() => true),
     };
-    message = { error: vi.fn() };
+    message = { error: vi.fn(), success: vi.fn() };
     route = { snapshot: { queryParamMap: { get: vi.fn(() => null) } } };
     router = { navigate: vi.fn() };
     component = new SessionAudit(
@@ -279,6 +279,31 @@ describe('SessionAudit', () => {
     expect(component.displayUser('unknown-user')).toBe('unknown-user');
   });
 
+  it('formats compact IDs, CR labels, and operator-facing record type labels', () => {
+    expect(component.compactId('sess-92542f171a442422a72c03e214245a36')).toBe('sess-92542f...');
+    expect(component.compactId('short-id')).toBe('short-id');
+    expect(component.crLabel('37650e46-5a59-4cb0-b46e-427716ab8544')).toBe('CR-16AB8544');
+    expect(component.crLabel('')).toBe('Direct');
+    expect(component.recordTypeLabel('output')).toBe('Terminal output');
+    expect(component.recordTypeLabel('command')).toBe('Commands');
+    expect(component.recordTypeLabel('session_event')).toBe('Session events');
+    expect(component.recordTypeLabel('control')).toBe('Controls');
+  });
+
+  it('copies the full raw ID instead of the compact display value', async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+
+    component.copyValue('sess-92542f171a442422a72c03e214245a36');
+    await Promise.resolve();
+
+    expect(writeText).toHaveBeenCalledWith('sess-92542f171a442422a72c03e214245a36');
+    expect(message.success).toHaveBeenCalledWith('Copied to clipboard');
+  });
+
   it('groups global terminal output chunks into one multiline row', () => {
     const outputA: SessionAuditRecord = {
       ...records[1],
@@ -318,6 +343,21 @@ describe('SessionAudit', () => {
     expect(component.auditRecordRows.length).toBe(1);
     expect(component.auditRecordRows[0].body).toBe('lrta');
     expect(component.auditRecordRows[0].sequenceContext).toBe('seq 5-8');
+  });
+
+  it('groups nearby orphan output records in one search row', () => {
+    const orphanRecords: SessionAuditRecord[] = [
+      { ...records[1], sequence: 11, commandId: undefined, outputDataBase64: btoa('c'), byteCount: 1 },
+      { ...records[1], sequence: 8, commandId: undefined, outputDataBase64: btoa('b'), byteCount: 1 },
+      { ...records[1], sequence: 5, commandId: undefined, outputDataBase64: btoa('a'), byteCount: 1 },
+    ];
+    sessionAuditService.listAuditRecords.mockReturnValueOnce(of({ records: orphanRecords }));
+
+    component.applyRecordFilters();
+
+    expect(component.auditRecordRows.length).toBe(1);
+    expect(component.auditRecordRows[0].body).toBe('abc');
+    expect(component.auditRecordRows[0].sequenceContext).toBe('seq 5-11');
   });
 
   it('keeps command-id output and orphan output in separate grouped search rows', () => {
@@ -368,6 +408,55 @@ describe('SessionAudit', () => {
       'echo "test"',
     ]);
     expect(component.commandGroups.some((group) => group.id === 'startup-output')).toBe(false);
+  });
+
+  it('labels real orphan output as terminal output in the timeline', () => {
+    const orphanOnlyRecords: SessionAuditRecord[] = [
+      {
+        ...records[1],
+        sequence: 1,
+        commandId: undefined,
+        outputDataBase64: btoa('login banner\r\n'),
+        byteCount: 14,
+      },
+    ];
+    sessionAuditService.listRecords.mockReturnValueOnce(of({ records: orphanOnlyRecords }));
+
+    component.selectSession(session);
+
+    expect(component.commandGroups.length).toBe(1);
+    expect(component.commandGroups[0].command.commandText).toBe('Terminal output');
+    expect(component.commandGroups[0].outputText).toBe('login banner');
+  });
+
+  it('renders collapsed orphan command echo as readable command lines in search rows', () => {
+    const searchRecords: SessionAuditRecord[] = [
+      {
+        ...records[0],
+        sequence: 1,
+        commandId: 'cmd-1',
+        commandText: 'ls -lrta',
+      },
+      {
+        ...records[0],
+        sequence: 2,
+        commandId: 'cmd-2',
+        commandText: 'echo "test"',
+      },
+      {
+        ...records[1],
+        sequence: 3,
+        commandId: undefined,
+        outputDataBase64: btoa('ls -lrtaecho "test"'),
+        byteCount: 20,
+      },
+    ];
+    sessionAuditService.listAuditRecords.mockReturnValueOnce(of({ records: searchRecords }));
+
+    component.applyRecordFilters();
+
+    const outputRow = component.auditRecordRows.find((row) => row.primary.recordType === 'output');
+    expect(outputRow?.body).toBe('ls -lrta\necho "test"');
   });
 
   it('removes command echo from clean command output while preserving raw output', () => {

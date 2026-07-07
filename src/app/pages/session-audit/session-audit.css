@@ -82,6 +82,36 @@
   overflow-wrap: anywhere;
 }
 
+.copy-chip,
+.context-chip {
+  max-width: 100%;
+  border: 0;
+  background: transparent;
+  color: #45536a;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.copy-chip:hover,
+.context-chip:hover {
+  color: #1677ff;
+  text-decoration: underline;
+}
+
+.copy-chip {
+  display: inline-block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta-copy {
+  display: block;
+  color: #253044;
+  font-size: 13px;
+}
+
 .muted {
   color: #667085;
   font-size: 11px;
@@ -170,12 +200,27 @@
   margin-bottom: 12px;
 }
 
-.record-subtitle {
+.context-chip-row {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  max-width: 100%;
+}
+
+.context-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  max-width: 220px;
+  border: 1px solid #d9e2ef;
+  border-radius: 6px;
+  background: #f8fafc;
+  padding: 2px 8px;
   color: #667085;
   font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .timeline {
@@ -264,6 +309,12 @@
 .load-more {
   width: 100%;
   margin-top: 12px;
+}
+
+.filter-hint {
+  margin: -2px 0 10px;
+  color: #667085;
+  font-size: 12px;
 }
 
 .log-body {
