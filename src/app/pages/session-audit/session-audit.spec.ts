@@ -88,15 +88,15 @@ describe('SessionAudit', () => {
     );
   });
 
-  it('loads sessions and selects the first session on init', () => {
+  it('loads sessions without fetching heavyweight detail views on init', () => {
     component.ngOnInit();
 
     expect(sessionAuditService.listSessions).toHaveBeenCalled();
     expect(component.sessions).toEqual([session]);
-    expect(component.selectedSession?.sessionId).toBe('sess-1');
-    expect(sessionAuditService.listRecords).toHaveBeenCalledWith('sess-1', 500, undefined);
-    expect(sessionAuditService.listAuditRecords).toHaveBeenCalled();
-    expect(incidentAgentService.listEvents).toHaveBeenCalled();
+    expect(component.selectedSession).toBeNull();
+    expect(sessionAuditService.listRecords).not.toHaveBeenCalled();
+    expect(sessionAuditService.listAuditRecords).not.toHaveBeenCalled();
+    expect(incidentAgentService.listEvents).not.toHaveBeenCalled();
   });
 
   it('treats null audit and agentic lists as empty', () => {
@@ -107,6 +107,8 @@ describe('SessionAudit', () => {
     incidentAgentService.list.mockReturnValueOnce(of({ incidents: null } as any));
 
     component.ngOnInit();
+    component.applyRecordFilters();
+    component.onTabChange(1);
 
     expect(component.sessions).toEqual([]);
     expect(component.auditRecords).toEqual([]);
@@ -116,12 +118,13 @@ describe('SessionAudit', () => {
   });
 
   it('groups command output by command id', () => {
-    component.records = records;
+    component.selectSession(session);
 
     const groups = component.commandGroups;
     expect(groups.length).toBe(1);
     expect(groups[0].command.commandText).toBe('pwd');
-    expect(component.outputText(groups[0].outputs)).toContain('/home/ubuntu');
+    expect(groups[0].outputText).toContain('/home/ubuntu');
+    expect(sessionAuditService.listRecords).toHaveBeenCalledWith('sess-1', 100, undefined);
   });
 
   it('applies filters when searching', () => {
@@ -169,5 +172,16 @@ describe('SessionAudit', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/audit'], expect.objectContaining({
       queryParams: expect.objectContaining({ tab: 'agentic', hostId: 'host-1' }),
     }));
+  });
+
+  it('loads the Agentic AI tab lazily', () => {
+    component.ngOnInit();
+    expect(incidentAgentService.listEvents).not.toHaveBeenCalled();
+
+    component.onTabChange(1);
+
+    expect(incidentAgentService.listEvents).toHaveBeenCalled();
+    expect(incidentAgentService.listAlerts).toHaveBeenCalled();
+    expect(incidentAgentService.list).toHaveBeenCalled();
   });
 });

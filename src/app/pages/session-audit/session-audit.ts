@@ -33,7 +33,12 @@ interface CommandGroup {
   command: SessionAuditRecord;
   outputs: SessionAuditRecord[];
   controls: SessionAuditRecord[];
+  outputText: string;
+  outputBytes: number;
+  hasTruncatedOutput: boolean;
 }
+
+const SESSION_RECORD_LIMIT = 100;
 
 @Component({
   selector: 'app-session-audit',
@@ -131,6 +136,8 @@ export class SessionAudit implements OnInit {
   sessions: AuditSessionSummary[] = [];
   selectedSession: AuditSessionSummary | null = null;
   records: SessionAuditRecord[] = [];
+  commandGroups: CommandGroup[] = [];
+  sessionEventRecords: SessionAuditRecord[] = [];
   auditRecords: SessionAuditRecord[] = [];
   agentEvents: IncidentEvent[] = [];
   agentAlerts: ManagedAlert[] = [];
@@ -145,6 +152,8 @@ export class SessionAudit implements OnInit {
   nextAgentEventCursor?: string;
   nextAgentAlertCursor?: string;
   nextAgentIncidentCursor?: string;
+  private hasLoadedSshSessions = false;
+  private hasLoadedAgenticAudit = false;
 
   constructor(
     private sessionAudit: SessionAuditService,
@@ -156,9 +165,14 @@ export class SessionAudit implements OnInit {
 
   ngOnInit(): void {
     this.applyInitialQueryParams();
+    if (this.activeTabIndex === 1) {
+      this.loadAgenticAudit();
+      return;
+    }
     this.loadSessions();
-    this.loadAuditRecords();
-    this.loadAgenticAudit();
+    if (this.hasSshRecordFilters()) {
+      this.loadAuditRecords();
+    }
   }
 
   loadSessions(cursor?: string): void {
@@ -178,11 +192,10 @@ export class SessionAudit implements OnInit {
         this.sessions = cursor ? [...this.sessions, ...sessions] : sessions;
         this.nextSessionCursor = response.nextCursor;
         this.isLoadingSessions = false;
-        if (!cursor && this.sessions.length > 0) {
-          this.selectSession(this.sessions[0]);
-        } else if (!cursor) {
+        this.hasLoadedSshSessions = true;
+        if (!cursor) {
           this.selectedSession = null;
-          this.records = [];
+          this.setRecords([]);
         }
       },
       error: (err) => {
@@ -235,6 +248,7 @@ export class SessionAudit implements OnInit {
         this.agentEvents = cursor ? [...this.agentEvents, ...events] : events;
         this.nextAgentEventCursor = response.nextCursor;
         this.isLoadingAgentic = false;
+        this.hasLoadedAgenticAudit = true;
       },
       error: (err) => {
         this.isLoadingAgentic = false;
@@ -335,10 +349,10 @@ export class SessionAudit implements OnInit {
   loadRecords(cursor?: string): void {
     if (!this.selectedSession) return;
     this.isLoadingRecords = true;
-    this.sessionAudit.listRecords(this.selectedSession.sessionId, 500, cursor).subscribe({
+    this.sessionAudit.listRecords(this.selectedSession.sessionId, SESSION_RECORD_LIMIT, cursor).subscribe({
       next: (response) => {
         const records = response.records ?? [];
-        this.records = cursor ? [...this.records, ...records] : records;
+        this.setRecords(cursor ? [...this.records, ...records] : records);
         this.nextRecordCursor = response.nextCursor;
         this.isLoadingRecords = false;
       },
@@ -349,13 +363,45 @@ export class SessionAudit implements OnInit {
     });
   }
 
-  get commandGroups(): CommandGroup[] {
+  onTabChange(index: number): void {
+    this.activeTabIndex = index;
+    if (index === 1 && !this.hasLoadedAgenticAudit) {
+      this.loadAgenticAudit();
+      return;
+    }
+    if (index === 0 && !this.hasLoadedSshSessions) {
+      this.loadSessions();
+    }
+  }
+
+  refreshActiveTab(): void {
+    if (this.activeTabIndex === 1) {
+      this.loadAgenticAudit();
+      return;
+    }
+    this.loadSessions();
+  }
+
+  private setRecords(records: SessionAuditRecord[]): void {
+    this.records = records;
+    this.commandGroups = this.buildCommandGroups(records);
+    this.sessionEventRecords = records.filter((record) => record.recordType === 'session_event');
+  }
+
+  private buildCommandGroups(records: SessionAuditRecord[]): CommandGroup[] {
     const groups = new Map<string, CommandGroup>();
     const orphanOutputs: SessionAuditRecord[] = [];
-    for (const record of this.records) {
+    for (const record of records) {
       if (record.recordType === 'command') {
         const id = record.commandId || `seq-${record.sequence}`;
-        groups.set(id, { command: record, outputs: [], controls: [] });
+        groups.set(id, {
+          command: record,
+          outputs: [],
+          controls: [],
+          outputText: '',
+          outputBytes: 0,
+          hasTruncatedOutput: false,
+        });
         continue;
       }
       if (record.recordType === 'output') {
@@ -382,13 +428,17 @@ export class SessionAudit implements OnInit {
         },
         outputs: orphanOutputs,
         controls: [],
+        outputText: '',
+        outputBytes: 0,
+        hasTruncatedOutput: false,
       });
     }
+    for (const group of result) {
+      group.outputText = this.outputText(group.outputs);
+      group.outputBytes = this.outputBytes(group.outputs);
+      group.hasTruncatedOutput = this.hasTruncated(group.outputs);
+    }
     return result;
-  }
-
-  sessionEvents(): SessionAuditRecord[] {
-    return this.records.filter((record) => record.recordType === 'session_event');
   }
 
   outputText(records: SessionAuditRecord[]): string {
@@ -485,6 +535,10 @@ export class SessionAudit implements OnInit {
     if (!value) return '';
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? '' : this.toLocalInput(date);
+  }
+
+  private hasSshRecordFilters(): boolean {
+    return Object.values(this.recordFilters).some((value) => value !== '');
   }
 
   private sshQueryParams(): Record<string, string> {

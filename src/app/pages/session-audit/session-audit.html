@@ -4,13 +4,13 @@
       <h1>Audit</h1>
       <p>Review retained SSH session audit and Agentic AI metadata events.</p>
     </div>
-    <button nz-button nzType="default" (click)="activeTabIndex === 0 ? loadSessions() : loadAgenticAudit()">
+    <button nz-button nzType="default" (click)="refreshActiveTab()">
       <span nz-icon nzType="reload" nzTheme="outline"></span>
       Refresh
     </button>
   </div>
 
-  <nz-tabs [(nzSelectedIndex)]="activeTabIndex">
+  <nz-tabs [nzSelectedIndex]="activeTabIndex" (nzSelectedIndexChange)="onTabChange($event)">
     <nz-tab nzTitle="SSH Sessions">
       <div class="tab-body">
         <div class="filters">
@@ -112,13 +112,13 @@
                       <span class="timestamp">{{ group.command.createdAt | date:'HH:mm:ss' }}</span>
                     </div>
                     <div class="command-meta">
-                      <span>{{ outputBytes(group.outputs) }} bytes output</span>
-                      <nz-tag *ngIf="hasTruncated(group.outputs)" nzColor="orange">TRUNCATED</nz-tag>
+                      <span>{{ group.outputBytes }} bytes output</span>
+                      <nz-tag *ngIf="group.hasTruncatedOutput" nzColor="orange">TRUNCATED</nz-tag>
                       <nz-tag *ngIf="group.controls.length > 0" nzColor="red">CONTROL</nz-tag>
                     </div>
                     <details class="output-block" [open]="group.outputs.length > 0">
                       <summary>Output</summary>
-                      <pre>{{ outputText(group.outputs) }}</pre>
+                      <pre>{{ group.outputText }}</pre>
                     </details>
                   </article>
                 </div>
@@ -136,9 +136,9 @@
                 Load more records
               </button>
 
-              <div class="session-events" *ngIf="sessionEvents().length > 0">
+              <div class="session-events" *ngIf="sessionEventRecords.length > 0">
                 <div class="section-title">Session Events</div>
-                <div class="event-row" *ngFor="let event of sessionEvents()">
+                <div class="event-row" *ngFor="let event of sessionEventRecords">
                   <span>{{ event.createdAt | date:'HH:mm:ss' }}</span>
                   <span>{{ event.commandText }}</span>
                 </div>
