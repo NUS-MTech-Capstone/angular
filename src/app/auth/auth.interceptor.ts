@@ -19,10 +19,10 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   if (isPlatformRequest) {
     headers['X-Request-ID'] = crypto.randomUUID();
+    headers[API_VERSION_HEADER] = API_VERSION;
   }
 
   if (req.url.startsWith(apiBaseUrl)) {
-    headers[API_VERSION_HEADER] = API_VERSION;
     if (auth.authMode === 'dev' && auth.accessToken) {
       headers['Authorization'] = `Bearer ${auth.accessToken}`;
     }

@@ -380,6 +380,7 @@ describe('TerminalPage', () => {
     await rejoinFixture.whenStable();
 
     expect(MockWebSocket.instances[0].url).toContain('fresh-token');
+    expect(MockWebSocket.instances[0].url).toContain('apiVersion=1');
     testing.verify();
   });
 
@@ -422,6 +423,7 @@ describe('TerminalPage', () => {
     await observeFixture.whenStable();
 
     expect(MockWebSocket.instances[0].url).toContain('observer-token');
+    expect(MockWebSocket.instances[0].url).toContain('apiVersion=1');
     const ws = MockWebSocket.instances[0];
     ws.onopen?.();
     expect(ws.send).not.toHaveBeenCalled();

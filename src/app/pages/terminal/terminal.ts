@@ -22,7 +22,7 @@ import { NzSwitchModule } from 'ng-zorro-antd/switch';
 import { NzTooltipModule } from 'ng-zorro-antd/tooltip';
 import { ITheme, Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
-import { gatewayPath } from '../../core/api.constants';
+import { API_VERSION, gatewayPath } from '../../core/api.constants';
 
 /** Binary terminal protocol — must match proxy-dataplane/internal/protocol/packet.go */
 const enum PktType {
@@ -303,7 +303,7 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
   private openWebSocket(url: string, token: string): void {
     const requestId = crypto.randomUUID();
     const separator = url.includes('?') ? '&' : '?';
-    const wsUrl = `${url}${separator}token=${encodeURIComponent(token)}&requestId=${encodeURIComponent(requestId)}`;
+    const wsUrl = `${url}${separator}token=${encodeURIComponent(token)}&requestId=${encodeURIComponent(requestId)}&apiVersion=${encodeURIComponent(API_VERSION)}`;
     const ws = new WebSocket(wsUrl);
     ws.binaryType = 'arraybuffer';
     this.ws = ws;

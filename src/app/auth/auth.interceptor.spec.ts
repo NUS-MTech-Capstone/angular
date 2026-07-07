@@ -40,7 +40,7 @@ describe('authInterceptor', () => {
     httpMock.verify();
   });
 
-  it('adds dev authorization and API version only to Nest APIs', () => {
+  it('adds dev authorization and API version to Nest APIs', () => {
     http.get(apiPath('auth/me')).subscribe();
 
     const request = httpMock.expectOne(apiPath('auth/me'));
@@ -58,6 +58,16 @@ describe('authInterceptor', () => {
     const request = httpMock.expectOne(apiPath('auth/me'));
     expect(request.request.headers.has('Authorization')).toBe(false);
     expect(request.request.headers.get(API_VERSION_HEADER)).toBe(API_VERSION);
+    request.flush({});
+  });
+
+  it('adds API version to gateway platform APIs without dev authorization', () => {
+    http.get('/sessions?mine=true').subscribe();
+
+    const request = httpMock.expectOne('/sessions?mine=true');
+    expect(request.request.headers.has('Authorization')).toBe(false);
+    expect(request.request.headers.get(API_VERSION_HEADER)).toBe(API_VERSION);
+    expect(request.request.headers.get('X-Request-ID')).toBeTruthy();
     request.flush({});
   });
 
