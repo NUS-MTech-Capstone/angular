@@ -119,7 +119,7 @@ export class AgenticAi implements OnInit {
     this.isLoading = true;
     this.incidentAgent.list().subscribe({
       next: (response) => {
-        this.incidents = response.incidents;
+        this.incidents = response.incidents ?? [];
         this.isLoading = false;
         this.refreshSelectedSummary();
         if (openIncidentId) {

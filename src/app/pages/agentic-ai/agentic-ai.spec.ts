@@ -187,6 +187,15 @@ describe('AgenticAi', () => {
     expect(component.filteredIncidents[0].state).toBe('FAILED');
   });
 
+  it('treats null incident lists as empty', () => {
+    incidentAgent.list.mockReturnValueOnce(of({ incidents: null } as any));
+
+    component.loadIncidents();
+
+    expect(component.incidents).toEqual([]);
+    expect(component.filteredIncidents).toEqual([]);
+  });
+
   it('loads incident details into the drawer', () => {
     component.openIncident(incident());
 

@@ -120,7 +120,7 @@ export class AgenticAiAlerts implements OnInit {
     this.isLoading = true;
     this.incidentAgent.listAlerts().subscribe({
       next: (response) => {
-        this.alerts = response.alerts;
+        this.alerts = response.alerts ?? [];
         this.isLoading = false;
       },
       error: (error: unknown) => {

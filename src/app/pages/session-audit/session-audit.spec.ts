@@ -99,6 +99,22 @@ describe('SessionAudit', () => {
     expect(incidentAgentService.listEvents).toHaveBeenCalled();
   });
 
+  it('treats null audit and agentic lists as empty', () => {
+    sessionAuditService.listSessions.mockReturnValueOnce(of({ sessions: null } as any));
+    sessionAuditService.listAuditRecords.mockReturnValueOnce(of({ records: null } as any));
+    incidentAgentService.listEvents.mockReturnValueOnce(of({ events: null } as any));
+    incidentAgentService.listAlerts.mockReturnValueOnce(of({ alerts: null } as any));
+    incidentAgentService.list.mockReturnValueOnce(of({ incidents: null } as any));
+
+    component.ngOnInit();
+
+    expect(component.sessions).toEqual([]);
+    expect(component.auditRecords).toEqual([]);
+    expect(component.agentEvents).toEqual([]);
+    expect(component.agentAlerts).toEqual([]);
+    expect(component.agentIncidents).toEqual([]);
+  });
+
   it('groups command output by command id', () => {
     component.records = records;
 

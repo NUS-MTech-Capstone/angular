@@ -193,6 +193,15 @@ describe('AgenticAiAlerts', () => {
     expect(component.failedCount).toBe(1);
   });
 
+  it('treats null alert lists as empty', () => {
+    incidentAgent.listAlerts.mockReturnValueOnce(of({ alerts: null } as any));
+
+    component.loadAlerts();
+
+    expect(component.alerts).toEqual([]);
+    expect(component.filteredAlerts).toEqual([]);
+  });
+
   it('filters alerts by status, CloudWatch state, and host', () => {
     component.alerts = [
       alert('PENDING_APPROVAL'),

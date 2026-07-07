@@ -174,7 +174,8 @@ export class SessionAudit implements OnInit {
       cursor,
     }).subscribe({
       next: (response) => {
-        this.sessions = cursor ? [...this.sessions, ...response.sessions] : response.sessions;
+        const sessions = response.sessions ?? [];
+        this.sessions = cursor ? [...this.sessions, ...sessions] : sessions;
         this.nextSessionCursor = response.nextCursor;
         this.isLoadingSessions = false;
         if (!cursor && this.sessions.length > 0) {
@@ -205,7 +206,8 @@ export class SessionAudit implements OnInit {
       cursor,
     }).subscribe({
       next: (response) => {
-        this.auditRecords = cursor ? [...this.auditRecords, ...response.records] : response.records;
+        const records = response.records ?? [];
+        this.auditRecords = cursor ? [...this.auditRecords, ...records] : records;
         this.nextAuditRecordCursor = response.nextCursor;
         this.isLoadingAuditRecords = false;
       },
@@ -229,7 +231,8 @@ export class SessionAudit implements OnInit {
       cursor,
     }).subscribe({
       next: (response) => {
-        this.agentEvents = cursor ? [...this.agentEvents, ...response.events] : response.events;
+        const events = response.events ?? [];
+        this.agentEvents = cursor ? [...this.agentEvents, ...events] : events;
         this.nextAgentEventCursor = response.nextCursor;
         this.isLoadingAgentic = false;
       },
@@ -256,7 +259,8 @@ export class SessionAudit implements OnInit {
       cursor,
     }).subscribe({
       next: (response) => {
-        this.agentAlerts = cursor ? [...this.agentAlerts, ...response.alerts] : response.alerts;
+        const alerts = response.alerts ?? [];
+        this.agentAlerts = cursor ? [...this.agentAlerts, ...alerts] : alerts;
         this.nextAgentAlertCursor = response.nextCursor;
       },
       error: (err) => this.message.error(`Failed to load Agentic AI alerts: ${err?.message ?? 'Unknown error'}`),
@@ -275,7 +279,8 @@ export class SessionAudit implements OnInit {
       cursor,
     }).subscribe({
       next: (response) => {
-        this.agentIncidents = cursor ? [...this.agentIncidents, ...response.incidents] : response.incidents;
+        const incidents = response.incidents ?? [];
+        this.agentIncidents = cursor ? [...this.agentIncidents, ...incidents] : incidents;
         this.nextAgentIncidentCursor = response.nextCursor;
       },
       error: (err) => this.message.error(`Failed to load Agentic AI incidents: ${err?.message ?? 'Unknown error'}`),
@@ -332,7 +337,8 @@ export class SessionAudit implements OnInit {
     this.isLoadingRecords = true;
     this.sessionAudit.listRecords(this.selectedSession.sessionId, 500, cursor).subscribe({
       next: (response) => {
-        this.records = cursor ? [...this.records, ...response.records] : response.records;
+        const records = response.records ?? [];
+        this.records = cursor ? [...this.records, ...records] : records;
         this.nextRecordCursor = response.nextCursor;
         this.isLoadingRecords = false;
       },
