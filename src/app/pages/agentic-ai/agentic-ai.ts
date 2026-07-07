@@ -9,7 +9,7 @@ import { NzDrawerModule } from 'ng-zorro-antd/drawer';
 import { NzEmptyModule } from 'ng-zorro-antd/empty';
 import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzMessageService } from 'ng-zorro-antd/message';
-import { NzModalService } from 'ng-zorro-antd/modal';
+import { NzModalModule, NzModalService } from 'ng-zorro-antd/modal';
 import { NzSelectModule } from 'ng-zorro-antd/select';
 import { NzSpaceModule } from 'ng-zorro-antd/space';
 import { NzSpinModule } from 'ng-zorro-antd/spin';
@@ -53,6 +53,7 @@ const STATE_FILTERS: { label: string; value: StateFilter }[] = [
     NzDrawerModule,
     NzEmptyModule,
     NzIconModule,
+    NzModalModule,
     NzSelectModule,
     NzSpaceModule,
     NzSpinModule,

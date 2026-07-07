@@ -165,10 +165,13 @@ describe('AgenticAi', () => {
         { provide: IncidentAgentService, useValue: incidentAgent },
         { provide: AuthService, useValue: auth },
         { provide: NzMessageService, useValue: message },
-        { provide: NzModalService, useValue: modal },
         { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: { get: vi.fn(() => null) } } } },
       ],
-    }).compileComponents();
+    })
+      .overrideComponent(AgenticAi, {
+        add: { providers: [{ provide: NzModalService, useValue: modal }] },
+      })
+      .compileComponents();
 
     fixture = TestBed.createComponent(AgenticAi);
     component = fixture.componentInstance;
