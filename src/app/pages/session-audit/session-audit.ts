@@ -67,6 +67,7 @@ interface AuditRecordSearchRow {
 const SESSION_RECORD_LIMIT = 100;
 const DEFAULT_RECORD_TYPE: SessionAuditRecord['recordType'] | '' = '';
 const EMPTY_OUTPUT = 'No readable output retained for this record.';
+const ORPHAN_OUTPUT_SEQUENCE_GAP = 1;
 
 function defaultRecordFilters(): RecordFilters {
   return {
@@ -436,8 +437,12 @@ export class SessionAudit implements OnInit {
   private buildCommandGroups(records: SessionAuditRecord[]): CommandGroup[] {
     const groups = new Map<string, CommandGroup>();
     const orphanOutputs: SessionAuditRecord[] = [];
+    const commandTexts: string[] = [];
     for (const record of records) {
       if (record.recordType === 'command') {
+        if (record.commandText) {
+          commandTexts.push(record.commandText);
+        }
         const id = record.commandId || `seq-${record.sequence}`;
         groups.set(id, {
           id,
@@ -465,16 +470,17 @@ export class SessionAudit implements OnInit {
       }
     }
     const result = [...groups.values()];
-    if (orphanOutputs.length > 0) {
+    const visibleOrphanOutputs = this.visibleOrphanOutputs(orphanOutputs, commandTexts);
+    if (visibleOrphanOutputs.length > 0) {
       result.unshift({
         id: 'startup-output',
         command: {
-          ...orphanOutputs[0],
+          ...visibleOrphanOutputs[0],
           recordType: 'command',
-          commandText: 'Session output before first command',
+          commandText: 'Unassociated session output',
           commandId: 'startup-output',
         },
-        outputs: orphanOutputs,
+        outputs: visibleOrphanOutputs,
         controls: [],
         outputText: '',
         rawOutputText: '',
@@ -484,7 +490,7 @@ export class SessionAudit implements OnInit {
     }
     for (const group of result) {
       group.rawOutputText = this.rawOutputText(group.outputs);
-      group.outputText = this.cleanTerminalText(group.rawOutputText);
+      group.outputText = this.cleanCommandOutputText(group.outputs, group.command.commandText);
       group.outputBytes = this.outputBytes(group.outputs);
       group.hasTruncatedOutput = this.hasTruncated(group.outputs);
     }
@@ -608,7 +614,8 @@ export class SessionAudit implements OnInit {
       .replace(/\x1b[P^_][\s\S]*?\x1b\\/g, '')
       .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '')
       .replace(/\x1b[()][A-Za-z0-9]/g, '')
-      .replace(/\x1b[=>]/g, '');
+      .replace(/\x1b[=>]/g, '')
+      .replace(/\r\n/g, '\n');
     const lines = [''];
     let column = 0;
 
@@ -717,7 +724,13 @@ export class SessionAudit implements OnInit {
   private buildAuditRecordRows(records: SessionAuditRecord[]): AuditRecordSearchRow[] {
     const rows: AuditRecordSearchRow[] = [];
     const outputGroups = new Map<string, AuditRecordSearchRow>();
+    const commandTextByID = this.commandTextByID(records);
+    const commandTextsBySession = this.commandTextsBySession(records);
+    let activeOrphanOutputRow: AuditRecordSearchRow | undefined;
     for (const record of records) {
+      if (record.recordType !== 'output' || record.commandId) {
+        activeOrphanOutputRow = undefined;
+      }
       if (record.recordType === 'output' && record.commandId) {
         const key = `output:${record.sessionId}:${record.commandId}`;
         let row = outputGroups.get(key);
@@ -737,18 +750,44 @@ export class SessionAudit implements OnInit {
         row.records.push(record);
         continue;
       }
+      if (record.recordType === 'output') {
+        if (
+          activeOrphanOutputRow &&
+          activeOrphanOutputRow.primary.sessionId === record.sessionId &&
+          this.isNearOutputSequence(activeOrphanOutputRow.records[activeOrphanOutputRow.records.length - 1], record)
+        ) {
+          activeOrphanOutputRow.records.push(record);
+          continue;
+        }
+        activeOrphanOutputRow = {
+          key: `output-orphan:${record.sessionId}:${record.sequence}`,
+          primary: record,
+          records: [record],
+          body: '',
+          sequenceContext: '',
+          byteCount: 0,
+          truncated: false,
+        };
+        rows.push(activeOrphanOutputRow);
+        continue;
+      }
       rows.push(this.buildSingleAuditRecordRow(record));
     }
 
-    for (const row of outputGroups.values()) {
+    for (const row of rows.filter((candidate) => candidate.primary.recordType === 'output')) {
       const ordered = [...row.records].sort((a, b) => a.sequence - b.sequence);
       const first = ordered[0];
       const last = ordered[ordered.length - 1];
-      const preview = this.outputText(ordered).trim();
+      const commandText = first.commandId ? commandTextByID.get(first.commandId) : undefined;
+      const preview = first.commandId
+        ? this.cleanCommandOutputText(ordered, commandText).trim()
+        : this.cleanOrphanOutputText(ordered, commandTextsBySession.get(first.sessionId) ?? []).trim();
       row.body = preview ? this.truncate(preview, 500) : `${this.outputBytes(ordered)} bytes output (${EMPTY_OUTPUT})`;
       row.sequenceContext = first.sequence === last.sequence
         ? this.recordSequenceContext(first)
-        : `seq ${first.sequence}-${last.sequence} - ${first.commandId}`;
+        : first.commandId
+          ? `seq ${first.sequence}-${last.sequence} - ${first.commandId}`
+          : `seq ${first.sequence}-${last.sequence}`;
       row.byteCount = this.outputBytes(ordered);
       row.truncated = this.hasTruncated(ordered);
     }
@@ -765,6 +804,96 @@ export class SessionAudit implements OnInit {
       byteCount: record.byteCount,
       truncated: record.truncated,
     };
+  }
+
+  private cleanCommandOutputText(records: SessionAuditRecord[], commandText?: string): string {
+    const clean = this.outputText(records).trim();
+    if (!commandText) {
+      return clean;
+    }
+    return this.stripLeadingCommandEcho(clean, commandText);
+  }
+
+  private cleanOrphanOutputText(records: SessionAuditRecord[], commandTexts: string[]): string {
+    const clean = this.outputText(records).trim();
+    if (!clean || commandTexts.length === 0) {
+      return clean;
+    }
+    if (this.isCommandEchoOnly(clean, commandTexts)) {
+      return commandTexts.join('\n');
+    }
+    return clean;
+  }
+
+  private visibleOrphanOutputs(records: SessionAuditRecord[], commandTexts: string[]): SessionAuditRecord[] {
+    if (records.length === 0 || commandTexts.length === 0) {
+      return records;
+    }
+    const clean = this.outputText(records).trim();
+    return this.isCommandEchoOnly(clean, commandTexts) ? [] : records;
+  }
+
+  private stripLeadingCommandEcho(value: string, commandText: string): string {
+    const trimmed = value.trimStart();
+    if (trimmed === commandText) {
+      return '';
+    }
+    if (trimmed.startsWith(`${commandText}\n`)) {
+      return trimmed.slice(commandText.length).trimStart();
+    }
+    if (trimmed.startsWith(commandText)) {
+      return trimmed.slice(commandText.length).trimStart();
+    }
+    return value;
+  }
+
+  private isCommandEchoOnly(value: string, commandTexts: string[]): boolean {
+    const normalizedValue = this.normalizeEchoText(value);
+    if (!normalizedValue) {
+      return false;
+    }
+    const normalizedCommands = this.normalizeEchoText(commandTexts.join(''));
+    return normalizedValue === normalizedCommands ||
+      normalizedCommands.includes(normalizedValue) ||
+      normalizedValue.includes(normalizedCommands);
+  }
+
+  private normalizeEchoText(value: string): string {
+    return value.replace(/\s+/g, '');
+  }
+
+  private commandTextByID(records: SessionAuditRecord[]): Map<string, string> {
+    const commands = new Map<string, string>();
+    for (const record of records) {
+      if (record.recordType === 'command' && record.commandId && record.commandText) {
+        commands.set(record.commandId, record.commandText);
+      }
+    }
+    return commands;
+  }
+
+  private commandTextsBySession(records: SessionAuditRecord[]): Map<string, string[]> {
+    const commands = new Map<string, SessionAuditRecord[]>();
+    for (const record of records) {
+      if (record.recordType !== 'command' || !record.commandText) {
+        continue;
+      }
+      const sessionCommands = commands.get(record.sessionId) ?? [];
+      sessionCommands.push(record);
+      commands.set(record.sessionId, sessionCommands);
+    }
+    const result = new Map<string, string[]>();
+    for (const [sessionID, sessionCommands] of commands.entries()) {
+      result.set(
+        sessionID,
+        sessionCommands.sort((a, b) => a.sequence - b.sequence).map((record) => record.commandText ?? ''),
+      );
+    }
+    return result;
+  }
+
+  private isNearOutputSequence(previous: SessionAuditRecord, current: SessionAuditRecord): boolean {
+    return Math.abs(previous.sequence - current.sequence) <= ORPHAN_OUTPUT_SEQUENCE_GAP;
   }
 
   private decodeOutput(value: string): string {

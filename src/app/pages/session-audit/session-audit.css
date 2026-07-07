@@ -70,14 +70,6 @@
   margin-bottom: 10px;
 }
 
-.session-row {
-  cursor: pointer;
-}
-
-.session-row.selected td {
-  background: #eef6ff;
-}
-
 .mono {
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 12px;
@@ -93,6 +85,81 @@
 .muted {
   color: #667085;
   font-size: 11px;
+}
+
+.session-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.session-card {
+  cursor: pointer;
+  border: 1px solid #e4e8f0;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+}
+
+.session-card:hover,
+.session-card.selected {
+  border-color: #91caff;
+  background: #f5fbff;
+}
+
+.session-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.session-card-title {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.session-card-title strong {
+  color: #1d2738;
+  font-size: 14px;
+}
+
+.session-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.session-card-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  margin-top: 12px;
+}
+
+.session-card-meta > div {
+  min-width: 0;
+}
+
+.session-card-meta .meta-label {
+  display: block;
+  margin-bottom: 2px;
+  color: #667085;
+  font-size: 11px;
+}
+
+.session-card-meta .meta-value {
+  display: block;
+  color: #253044;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.session-card-footer {
+  margin-top: 10px;
 }
 
 .record-header {
@@ -200,7 +267,7 @@
 }
 
 .log-body {
-  width: 36%;
+  width: 40%;
   min-width: 260px;
   max-width: 520px;
 }
@@ -210,6 +277,12 @@
   display: block;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.log-body code {
+  max-height: 220px;
+  overflow: auto;
+  line-height: 1.45;
 }
 
 .metadata {

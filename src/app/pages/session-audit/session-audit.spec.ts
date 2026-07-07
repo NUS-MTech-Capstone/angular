@@ -304,6 +304,92 @@ describe('SessionAudit', () => {
     expect(component.auditRecordRows[0].sequenceContext).toBe('seq 2-3 - cmd-1');
   });
 
+  it('groups adjacent orphan output characters into one search row', () => {
+    const orphanRecords: SessionAuditRecord[] = [
+      { ...records[1], sequence: 8, commandId: undefined, outputDataBase64: btoa('a'), byteCount: 1 },
+      { ...records[1], sequence: 7, commandId: undefined, outputDataBase64: btoa('t'), byteCount: 1 },
+      { ...records[1], sequence: 6, commandId: undefined, outputDataBase64: btoa('r'), byteCount: 1 },
+      { ...records[1], sequence: 5, commandId: undefined, outputDataBase64: btoa('l'), byteCount: 1 },
+    ];
+    sessionAuditService.listAuditRecords.mockReturnValueOnce(of({ records: orphanRecords }));
+
+    component.applyRecordFilters();
+
+    expect(component.auditRecordRows.length).toBe(1);
+    expect(component.auditRecordRows[0].body).toBe('lrta');
+    expect(component.auditRecordRows[0].sequenceContext).toBe('seq 5-8');
+  });
+
+  it('keeps command-id output and orphan output in separate grouped search rows', () => {
+    const mixedRecords: SessionAuditRecord[] = [
+      { ...records[1], sequence: 5, commandId: 'cmd-1', outputDataBase64: btoa('/home\n'), byteCount: 6 },
+      { ...records[1], sequence: 4, commandId: undefined, outputDataBase64: btoa('d'), byteCount: 1 },
+      { ...records[1], sequence: 3, commandId: undefined, outputDataBase64: btoa('p'), byteCount: 1 },
+    ];
+    sessionAuditService.listAuditRecords.mockReturnValueOnce(of({ records: mixedRecords }));
+
+    component.applyRecordFilters();
+
+    expect(component.auditRecordRows.length).toBe(2);
+    expect(component.auditRecordRows[0].sequenceContext).toBe('seq 5 - cmd-1');
+    expect(component.auditRecordRows[0].body).toContain('/home');
+    expect(component.auditRecordRows[1].sequenceContext).toBe('seq 3-4');
+    expect(component.auditRecordRows[1].body).toBe('pd');
+  });
+
+  it('does not show command echo as fake startup output when command records exist', () => {
+    const timelineRecords: SessionAuditRecord[] = [
+      {
+        ...records[0],
+        sequence: 1,
+        commandId: 'cmd-1',
+        commandText: 'ls -lrta',
+      },
+      {
+        ...records[0],
+        sequence: 2,
+        commandId: 'cmd-2',
+        commandText: 'echo "test"',
+      },
+      {
+        ...records[1],
+        sequence: 3,
+        commandId: undefined,
+        outputDataBase64: btoa('ls -lrtaecho "test"'),
+        byteCount: 20,
+      },
+    ];
+    sessionAuditService.listRecords.mockReturnValueOnce(of({ records: timelineRecords }));
+
+    component.selectSession(session);
+
+    expect(component.commandGroups.map((group) => group.command.commandText)).toEqual([
+      'ls -lrta',
+      'echo "test"',
+    ]);
+    expect(component.commandGroups.some((group) => group.id === 'startup-output')).toBe(false);
+  });
+
+  it('removes command echo from clean command output while preserving raw output', () => {
+    const echoedOutput: SessionAuditRecord = {
+      ...records[1],
+      outputDataBase64: btoa('pwd\r\n/home/ubuntu\r\n'),
+      byteCount: 18,
+    };
+    sessionAuditService.listRecords.mockReturnValueOnce(of({ records: [records[0], echoedOutput] }));
+
+    component.selectSession(session);
+
+    const group = component.commandGroups[0];
+    expect(group.outputText).toBe('/home/ubuntu');
+    expect(group.rawOutputText).toContain('pwd\r\n');
+    expect(component.displayOutput(group)).toBe('/home/ubuntu');
+
+    component.setOutputViewMode(group, 'raw');
+
+    expect(component.displayOutput(group)).toContain('pwd\r\n');
+  });
+
   it('opens a global record in the session timeline', () => {
     component.sessions = [session];
 

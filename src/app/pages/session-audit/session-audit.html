@@ -31,55 +31,53 @@
           <section class="session-list">
             <div class="section-title">Sessions</div>
             <nz-spin [nzSpinning]="isLoadingSessions">
-              <nz-table
-                #sessionTable
-                nzSize="small"
-                [nzData]="sessions"
-                [nzFrontPagination]="false"
-                [nzShowPagination]="false">
-                <thead>
-                  <tr>
-                    <th>Session</th>
-                    <th>CR ID</th>
-                    <th>User</th>
-                    <th>Host</th>
-                    <th>Started</th>
-                    <th>Last record / Ended</th>
-                    <th>State</th>
-                    <th>Records</th>
-                    <th>Agentic</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    *ngFor="let session of sessionTable.data"
-                    class="session-row"
-                    [class.selected]="selectedSession?.sessionId === session.sessionId"
-                    (click)="selectSession(session)">
-                    <td>
-                      <div class="mono">{{ session.sessionId }}</div>
-                      <nz-tag *ngIf="session.truncated" nzColor="orange">TRUNCATED</nz-tag>
-                    </td>
-                    <td class="mono compact-id">{{ crLabel(session.crId) }}</td>
-                    <td>
-                      <div>{{ displayUser(session.userId) }}</div>
-                      <div class="muted compact-id">{{ session.userId }}</div>
-                    </td>
-                    <td>{{ session.hostId }}</td>
-                    <td>{{ session.createdAt | date:'MMM d, HH:mm' }}</td>
-                    <td>{{ session.lastAuditAt | date:'MMM d, HH:mm' }}</td>
-                    <td>
+              <div *ngIf="sessions.length > 0" class="session-card-list">
+                <article
+                  *ngFor="let session of sessions"
+                  class="session-card"
+                  [class.selected]="selectedSession?.sessionId === session.sessionId"
+                  (click)="selectSession(session)">
+                  <div class="session-card-header">
+                    <div class="session-card-title">
+                      <strong>{{ displayUser(session.userId) }}</strong>
+                      <span class="mono compact-id" [title]="session.sessionId">{{ session.sessionId }}</span>
+                    </div>
+                    <div class="session-card-actions">
                       <nz-tag [nzColor]="sessionStatusColor(session.status)">{{ session.status }}</nz-tag>
-                    </td>
-                    <td>{{ session.recordCount }}</td>
-                    <td>
                       <button nz-button nzSize="small" nzType="link" (click)="$event.stopPropagation(); searchAgenticForSession(session)">
                         Logs
                       </button>
-                    </td>
-                  </tr>
-                </tbody>
-              </nz-table>
+                    </div>
+                  </div>
+
+                  <div class="session-card-meta">
+                    <div>
+                      <span class="meta-label">CR ID</span>
+                      <span class="meta-value mono" [title]="session.crId">{{ crLabel(session.crId) }}</span>
+                    </div>
+                    <div>
+                      <span class="meta-label">Host</span>
+                      <span class="meta-value">{{ session.hostId }}</span>
+                    </div>
+                    <div>
+                      <span class="meta-label">Started</span>
+                      <span class="meta-value">{{ session.createdAt | date:'MMM d, HH:mm' }}</span>
+                    </div>
+                    <div>
+                      <span class="meta-label">Last record / Ended</span>
+                      <span class="meta-value">{{ session.lastAuditAt | date:'MMM d, HH:mm' }}</span>
+                    </div>
+                    <div>
+                      <span class="meta-label">Records</span>
+                      <span class="meta-value">{{ session.recordCount }}</span>
+                    </div>
+                  </div>
+
+                  <div class="session-card-footer" *ngIf="session.truncated">
+                    <nz-tag nzColor="orange">TRUNCATED</nz-tag>
+                  </div>
+                </article>
+              </div>
               <nz-empty *ngIf="!isLoadingSessions && sessions.length === 0" nzNotFoundContent="No audited sessions found"></nz-empty>
             </nz-spin>
             <button
