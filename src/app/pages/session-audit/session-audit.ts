@@ -23,6 +23,8 @@ import {
   IncidentSummary,
   ManagedAlert,
 } from '../../services/incident-agent.service';
+import { AuthService } from '../../services/auth.service';
+import { IdentityService, ManagedUser } from '../../services/identity.service';
 import {
   AuditSessionSummary,
   SessionAuditRecord,
@@ -52,8 +54,18 @@ interface RecordFilters {
   to: string;
 }
 
+interface AuditRecordSearchRow {
+  key: string;
+  primary: SessionAuditRecord;
+  records: SessionAuditRecord[];
+  body: string;
+  sequenceContext: string;
+  byteCount: number;
+  truncated: boolean;
+}
+
 const SESSION_RECORD_LIMIT = 100;
-const DEFAULT_RECORD_TYPE: SessionAuditRecord['recordType'] = 'command';
+const DEFAULT_RECORD_TYPE: SessionAuditRecord['recordType'] | '' = '';
 const EMPTY_OUTPUT = 'No readable output retained for this record.';
 
 function defaultRecordFilters(): RecordFilters {
@@ -159,6 +171,7 @@ export class SessionAudit implements OnInit {
   commandGroups: CommandGroup[] = [];
   sessionEventRecords: SessionAuditRecord[] = [];
   auditRecords: SessionAuditRecord[] = [];
+  auditRecordRows: AuditRecordSearchRow[] = [];
   agentEvents: IncidentEvent[] = [];
   agentAlerts: ManagedAlert[] = [];
   agentIncidents: IncidentSummary[] = [];
@@ -173,12 +186,15 @@ export class SessionAudit implements OnInit {
   nextAgentAlertCursor?: string;
   nextAgentIncidentCursor?: string;
   outputViewModes: Record<string, OutputViewMode> = {};
+  private userDisplayBySub = new Map<string, string>();
   private hasLoadedSshSessions = false;
   private hasLoadedAgenticAudit = false;
 
   constructor(
     private sessionAudit: SessionAuditService,
     private incidentAgent: IncidentAgentService,
+    private identityService: IdentityService,
+    private auth: AuthService,
     private message: NzMessageService,
     private route: ActivatedRoute,
     private router: Router,
@@ -186,6 +202,7 @@ export class SessionAudit implements OnInit {
 
   ngOnInit(): void {
     this.applyInitialQueryParams();
+    this.loadIdentityUsers();
     if (this.activeTabIndex === 1) {
       this.loadAgenticAudit();
       return;
@@ -248,6 +265,7 @@ export class SessionAudit implements OnInit {
       next: (response) => {
         const records = response.records ?? [];
         this.auditRecords = cursor ? [...this.auditRecords, ...records] : records;
+        this.auditRecordRows = this.buildAuditRecordRows(this.auditRecords);
         this.nextAuditRecordCursor = response.nextCursor;
         this.isLoadingAuditRecords = false;
       },
@@ -631,6 +649,124 @@ export class SessionAudit implements OnInit {
     return lines.join('\n').replace(/[ \t]+\n/g, '\n').replace(/[ \t]+$/g, '');
   }
 
+  displayUser(userId: string): string {
+    return this.userDisplayBySub.get(userId) ?? userId;
+  }
+
+  sessionStatusColor(status: string): string {
+    switch (status) {
+      case 'ACTIVE':
+        return 'green';
+      case 'CLOSED':
+        return 'default';
+      default:
+        return 'blue';
+    }
+  }
+
+  recordTypeLabel(recordType: SessionAuditRecord['recordType']): string {
+    switch (recordType) {
+      case 'command':
+        return 'Command';
+      case 'output':
+        return 'Terminal output';
+      case 'control':
+        return 'Control';
+      case 'session_event':
+        return 'Session lifecycle';
+    }
+  }
+
+  crLabel(crId: string): string {
+    return crId || 'Direct';
+  }
+
+  rowBodyPreview(row: AuditRecordSearchRow): string {
+    return row.body;
+  }
+
+  rowSequenceContext(row: AuditRecordSearchRow): string {
+    return row.sequenceContext;
+  }
+
+  private loadIdentityUsers(): void {
+    if (!this.auth.hasPermission('identity.users.view')) {
+      return;
+    }
+    this.identityService.listUsers().subscribe({
+      next: (users) => {
+        this.userDisplayBySub = this.buildUserDisplayMap(users ?? []);
+      },
+      error: () => {
+        this.userDisplayBySub = new Map<string, string>();
+      },
+    });
+  }
+
+  private buildUserDisplayMap(users: ManagedUser[]): Map<string, string> {
+    const display = new Map<string, string>();
+    for (const user of users) {
+      if (!user.sub) {
+        continue;
+      }
+      display.set(user.sub, user.name || user.username || user.sub);
+    }
+    return display;
+  }
+
+  private buildAuditRecordRows(records: SessionAuditRecord[]): AuditRecordSearchRow[] {
+    const rows: AuditRecordSearchRow[] = [];
+    const outputGroups = new Map<string, AuditRecordSearchRow>();
+    for (const record of records) {
+      if (record.recordType === 'output' && record.commandId) {
+        const key = `output:${record.sessionId}:${record.commandId}`;
+        let row = outputGroups.get(key);
+        if (!row) {
+          row = {
+            key,
+            primary: record,
+            records: [],
+            body: '',
+            sequenceContext: '',
+            byteCount: 0,
+            truncated: false,
+          };
+          outputGroups.set(key, row);
+          rows.push(row);
+        }
+        row.records.push(record);
+        continue;
+      }
+      rows.push(this.buildSingleAuditRecordRow(record));
+    }
+
+    for (const row of outputGroups.values()) {
+      const ordered = [...row.records].sort((a, b) => a.sequence - b.sequence);
+      const first = ordered[0];
+      const last = ordered[ordered.length - 1];
+      const preview = this.outputText(ordered).trim();
+      row.body = preview ? this.truncate(preview, 500) : `${this.outputBytes(ordered)} bytes output (${EMPTY_OUTPUT})`;
+      row.sequenceContext = first.sequence === last.sequence
+        ? this.recordSequenceContext(first)
+        : `seq ${first.sequence}-${last.sequence} - ${first.commandId}`;
+      row.byteCount = this.outputBytes(ordered);
+      row.truncated = this.hasTruncated(ordered);
+    }
+    return rows;
+  }
+
+  private buildSingleAuditRecordRow(record: SessionAuditRecord): AuditRecordSearchRow {
+    return {
+      key: `${record.recordType}:${record.sessionId}:${record.sequence}`,
+      primary: record,
+      records: [record],
+      body: this.recordBodyPreview(record),
+      sequenceContext: this.recordSequenceContext(record),
+      byteCount: record.byteCount,
+      truncated: record.truncated,
+    };
+  }
+
   private decodeOutput(value: string): string {
     try {
       const binary = atob(value);
@@ -682,7 +818,7 @@ export class SessionAudit implements OnInit {
     return Number.isNaN(date.getTime()) ? '' : this.toLocalInput(date);
   }
 
-  private fromRecordTypeParam(value: string | null): SessionAuditRecord['recordType'] {
+  private fromRecordTypeParam(value: string | null): SessionAuditRecord['recordType'] | '' {
     if (
       value === 'command' ||
       value === 'output' ||
@@ -691,7 +827,7 @@ export class SessionAudit implements OnInit {
     ) {
       return value;
     }
-    return DEFAULT_RECORD_TYPE;
+    return '';
   }
 
   private hasSshRecordFilters(): boolean {

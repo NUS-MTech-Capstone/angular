@@ -40,9 +40,13 @@
                 <thead>
                   <tr>
                     <th>Session</th>
+                    <th>CR ID</th>
                     <th>User</th>
                     <th>Host</th>
-                    <th>Last Audit</th>
+                    <th>Started</th>
+                    <th>Last record / Ended</th>
+                    <th>State</th>
+                    <th>Records</th>
                     <th>Agentic</th>
                   </tr>
                 </thead>
@@ -56,9 +60,18 @@
                       <div class="mono">{{ session.sessionId }}</div>
                       <nz-tag *ngIf="session.truncated" nzColor="orange">TRUNCATED</nz-tag>
                     </td>
-                    <td>{{ session.userId }}</td>
+                    <td class="mono compact-id">{{ crLabel(session.crId) }}</td>
+                    <td>
+                      <div>{{ displayUser(session.userId) }}</div>
+                      <div class="muted compact-id">{{ session.userId }}</div>
+                    </td>
                     <td>{{ session.hostId }}</td>
+                    <td>{{ session.createdAt | date:'MMM d, HH:mm' }}</td>
                     <td>{{ session.lastAuditAt | date:'MMM d, HH:mm' }}</td>
+                    <td>
+                      <nz-tag [nzColor]="sessionStatusColor(session.status)">{{ session.status }}</nz-tag>
+                    </td>
+                    <td>{{ session.recordCount }}</td>
                     <td>
                       <button nz-button nzSize="small" nzType="link" (click)="$event.stopPropagation(); searchAgenticForSession(session)">
                         Logs
@@ -86,9 +99,9 @@
                   <div class="section-title">Command Timeline</div>
                   <div class="record-subtitle">
                     <span class="mono">{{ selectedSession.sessionId }}</span>
-                    <span>{{ selectedSession.userId }}</span>
+                    <span>{{ displayUser(selectedSession.userId) }}</span>
                     <span>{{ selectedSession.hostId }}</span>
-                    <span>{{ selectedSession.crId }}</span>
+                    <span>{{ crLabel(selectedSession.crId) }}</span>
                   </div>
                 </div>
                 <nz-tag [nzColor]="selectedSession.truncated ? 'orange' : 'green'">
@@ -178,10 +191,11 @@
             <input nz-input placeholder="Host ID" [(ngModel)]="recordFilters.hostId" (keyup.enter)="applyRecordFilters()" />
             <input nz-input placeholder="CR ID" [(ngModel)]="recordFilters.crId" (keyup.enter)="applyRecordFilters()" />
             <nz-select nzAllowClear nzPlaceHolder="Record type" [(ngModel)]="recordFilters.recordType">
-              <nz-option nzValue="command" nzLabel="Command"></nz-option>
-              <nz-option nzValue="output" nzLabel="Output"></nz-option>
-              <nz-option nzValue="control" nzLabel="Control"></nz-option>
-              <nz-option nzValue="session_event" nzLabel="Session event"></nz-option>
+              <nz-option nzValue="" nzLabel="All"></nz-option>
+              <nz-option nzValue="command" nzLabel="Commands"></nz-option>
+              <nz-option nzValue="output" nzLabel="Terminal output"></nz-option>
+              <nz-option nzValue="control" nzLabel="Controls"></nz-option>
+              <nz-option nzValue="session_event" nzLabel="Session lifecycle"></nz-option>
             </nz-select>
             <input nz-input type="datetime-local" [(ngModel)]="recordFilters.from" aria-label="Record from" />
             <input nz-input type="datetime-local" [(ngModel)]="recordFilters.to" aria-label="Record to" />
@@ -195,9 +209,10 @@
             <nz-table
               #recordTable
               nzSize="small"
-              [nzData]="auditRecords"
+              [nzData]="auditRecordRows"
               [nzFrontPagination]="false"
-              [nzShowPagination]="false">
+              [nzShowPagination]="false"
+              [nzNoResult]="sshRecordEmpty">
               <thead>
                 <tr>
                   <th>Time</th>
@@ -210,28 +225,33 @@
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let record of recordTable.data">
-                  <td>{{ record.createdAt | date:'MMM d, HH:mm:ss' }}</td>
-                  <td><nz-tag>{{ record.recordType }}</nz-tag></td>
+                <tr *ngFor="let row of recordTable.data">
+                  <td>{{ row.primary.createdAt | date:'MMM d, HH:mm:ss' }}</td>
+                  <td><nz-tag>{{ recordTypeLabel(row.primary.recordType) }}</nz-tag></td>
                   <td class="record-session-cell">
-                    <div class="mono compact-id">{{ record.sessionId }}</div>
-                    <div class="record-context">{{ recordSequenceContext(record) }}</div>
-                  </td>
-                  <td><span class="compact-id">{{ record.userId }}</span></td>
-                  <td>{{ record.hostId }}</td>
-                  <td class="log-body">
-                    <code>{{ recordBodyPreview(record) }}</code>
-                    <nz-tag *ngIf="record.truncated" nzColor="orange">TRUNCATED</nz-tag>
+                    <div class="mono compact-id">{{ row.primary.sessionId }}</div>
+                    <div class="record-context">{{ rowSequenceContext(row) }}</div>
                   </td>
                   <td>
-                    <button nz-button nzSize="small" nzType="link" (click)="openRecordTimeline(record)">
+                    <div>{{ displayUser(row.primary.userId) }}</div>
+                    <div class="muted compact-id">{{ row.primary.userId }}</div>
+                  </td>
+                  <td>{{ row.primary.hostId }}</td>
+                  <td class="log-body">
+                    <code>{{ rowBodyPreview(row) }}</code>
+                    <nz-tag *ngIf="row.truncated" nzColor="orange">TRUNCATED</nz-tag>
+                  </td>
+                  <td>
+                    <button nz-button nzSize="small" nzType="link" (click)="openRecordTimeline(row.primary)">
                       Open timeline
                     </button>
                   </td>
                 </tr>
               </tbody>
             </nz-table>
-            <nz-empty *ngIf="!isLoadingAuditRecords && auditRecords.length === 0" nzNotFoundContent="No SSH audit records found"></nz-empty>
+            <ng-template #sshRecordEmpty>
+              <nz-empty nzNotFoundContent="No SSH audit records found"></nz-empty>
+            </ng-template>
           </nz-spin>
           <button
             *ngIf="nextAuditRecordCursor"

@@ -5,6 +5,8 @@ import {
   SessionAuditService,
 } from '../../services/session-audit.service';
 import { IncidentAgentService } from '../../services/incident-agent.service';
+import { AuthService } from '../../services/auth.service';
+import { IdentityService } from '../../services/identity.service';
 import { SessionAudit } from './session-audit';
 
 describe('SessionAudit', () => {
@@ -19,6 +21,8 @@ describe('SessionAudit', () => {
     listAlerts: ReturnType<typeof vi.fn>;
     list: ReturnType<typeof vi.fn>;
   };
+  let identityService: { listUsers: ReturnType<typeof vi.fn> };
+  let authService: { hasPermission: ReturnType<typeof vi.fn> };
   let message: { error: ReturnType<typeof vi.fn> };
   let route: { snapshot: { queryParamMap: { get: ReturnType<typeof vi.fn> } } };
   let router: { navigate: ReturnType<typeof vi.fn> };
@@ -90,12 +94,29 @@ describe('SessionAudit', () => {
       listAlerts: vi.fn(() => of({ alerts: [] })),
       list: vi.fn(() => of({ incidents: [] })),
     };
+    identityService = {
+      listUsers: vi.fn(() => of([
+        {
+          sub: 'user-1',
+          username: 'alice',
+          name: 'Alice Admin',
+          enabled: true,
+          status: 'CONFIRMED',
+          roles: [],
+        },
+      ])),
+    };
+    authService = {
+      hasPermission: vi.fn(() => true),
+    };
     message = { error: vi.fn() };
     route = { snapshot: { queryParamMap: { get: vi.fn(() => null) } } };
     router = { navigate: vi.fn() };
     component = new SessionAudit(
       sessionAuditService as unknown as SessionAuditService,
       incidentAgentService as unknown as IncidentAgentService,
+      identityService as unknown as IdentityService,
+      authService as unknown as AuthService,
       message as any,
       route as any,
       router as any,
@@ -106,6 +127,7 @@ describe('SessionAudit', () => {
     component.ngOnInit();
 
     expect(sessionAuditService.listSessions).toHaveBeenCalled();
+    expect(identityService.listUsers).toHaveBeenCalled();
     expect(component.sessions).toEqual([session]);
     expect(component.selectedSession).toBeNull();
     expect(sessionAuditService.listRecords).not.toHaveBeenCalled();
@@ -126,6 +148,7 @@ describe('SessionAudit', () => {
 
     expect(component.sessions).toEqual([]);
     expect(component.auditRecords).toEqual([]);
+    expect(component.auditRecordRows).toEqual([]);
     expect(component.agentEvents).toEqual([]);
     expect(component.agentAlerts).toEqual([]);
     expect(component.agentIncidents).toEqual([]);
@@ -189,7 +212,10 @@ describe('SessionAudit', () => {
     component.recordFilters.hostId = 'host-1';
     component.applyRecordFilters();
     expect(sessionAuditService.listAuditRecords).toHaveBeenLastCalledWith(
-      expect.objectContaining({ hostId: 'host-1', recordType: 'command', limit: 100 }),
+      expect.objectContaining({ hostId: 'host-1', limit: 100 }),
+    );
+    expect(sessionAuditService.listAuditRecords).toHaveBeenLastCalledWith(
+      expect.not.objectContaining({ recordType: 'command' }),
     );
 
     component.agentFilters.incidentId = 'inc-1';
@@ -205,13 +231,16 @@ describe('SessionAudit', () => {
     );
   });
 
-  it('uses command records as the default SSH record search and reset state', () => {
-    expect(component.recordFilters.recordType).toBe('command');
+  it('uses all records as the default SSH record search and reset state', () => {
+    expect(component.recordFilters.recordType).toBe('');
 
     component.applyRecordFilters();
 
     expect(sessionAuditService.listAuditRecords).toHaveBeenLastCalledWith(
-      expect.objectContaining({ recordType: 'command', limit: 100 }),
+      expect.objectContaining({ limit: 100 }),
+    );
+    expect(sessionAuditService.listAuditRecords).toHaveBeenLastCalledWith(
+      expect.not.objectContaining({ recordType: 'command' }),
     );
 
     component.recordFilters.recordType = 'output';
@@ -223,12 +252,15 @@ describe('SessionAudit', () => {
       userId: '',
       hostId: '',
       crId: '',
-      recordType: 'command',
+      recordType: '',
       from: '',
       to: '',
     });
     expect(sessionAuditService.listAuditRecords).toHaveBeenLastCalledWith(
-      expect.objectContaining({ recordType: 'command', limit: 100 }),
+      expect.objectContaining({ limit: 100 }),
+    );
+    expect(sessionAuditService.listAuditRecords).toHaveBeenLastCalledWith(
+      expect.not.objectContaining({ recordType: 'command' }),
     );
   });
 
@@ -238,6 +270,38 @@ describe('SessionAudit', () => {
     expect(preview).toContain('red');
     expect(preview).toContain('progress 100%');
     expect(preview).not.toContain('\x1b');
+  });
+
+  it('maps Cognito subjects to display names with raw id fallback', () => {
+    component.ngOnInit();
+
+    expect(component.displayUser('user-1')).toBe('Alice Admin');
+    expect(component.displayUser('unknown-user')).toBe('unknown-user');
+  });
+
+  it('groups global terminal output chunks into one multiline row', () => {
+    const outputA: SessionAuditRecord = {
+      ...records[1],
+      sequence: 2,
+      outputDataBase64: btoa('ls -lrta\r\n'),
+      byteCount: 10,
+    };
+    const outputB: SessionAuditRecord = {
+      ...records[1],
+      sequence: 3,
+      createdAt: '2026-07-01T00:01:02Z',
+      outputDataBase64: btoa('echo "test"\r\n'),
+      byteCount: 13,
+    };
+    sessionAuditService.listAuditRecords.mockReturnValueOnce(of({ records: [outputB, outputA] }));
+
+    component.applyRecordFilters();
+
+    expect(component.auditRecordRows.length).toBe(1);
+    expect(component.auditRecordRows[0].body).toContain('ls -lrta');
+    expect(component.auditRecordRows[0].body).toContain('echo "test"');
+    expect(component.auditRecordRows[0].body).toContain('\n');
+    expect(component.auditRecordRows[0].sequenceContext).toBe('seq 2-3 - cmd-1');
   });
 
   it('opens a global record in the session timeline', () => {

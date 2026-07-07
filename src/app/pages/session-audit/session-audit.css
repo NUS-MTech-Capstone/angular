@@ -90,6 +90,11 @@
   overflow-wrap: anywhere;
 }
 
+.muted {
+  color: #667085;
+  font-size: 11px;
+}
+
 .record-header {
   display: flex;
   align-items: flex-start;
@@ -202,6 +207,7 @@
 
 .log-body code,
 .metadata {
+  display: block;
   white-space: pre-wrap;
   word-break: break-word;
 }

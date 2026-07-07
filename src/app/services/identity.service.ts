@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 import { apiPath } from '../core/api.constants';
 
 export interface ManagedUser {
+  sub?: string;
   username: string;
   email?: string;
   name?: string;
