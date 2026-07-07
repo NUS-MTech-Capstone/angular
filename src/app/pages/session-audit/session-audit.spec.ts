@@ -65,6 +65,20 @@ describe('SessionAudit', () => {
     },
   ];
 
+  const noisyOutputRecord: SessionAuditRecord = {
+    sessionId: 'sess-1',
+    userId: 'user-1',
+    hostId: 'host-1',
+    crId: 'cr-1',
+    recordType: 'output',
+    sequence: 3,
+    commandId: 'cmd-1',
+    outputDataBase64: btoa('\x1b[31mred\x1b[0m\r\nold\b \bnew\nprogress 10%\rprogress 100%\n'),
+    createdAt: '2026-07-01T00:01:02Z',
+    truncated: false,
+    byteCount: 52,
+  };
+
   beforeEach(() => {
     sessionAuditService = {
       listSessions: vi.fn(() => of({ sessions: [session] })),
@@ -127,6 +141,33 @@ describe('SessionAudit', () => {
     expect(sessionAuditService.listRecords).toHaveBeenCalledWith('sess-1', 100, undefined);
   });
 
+  it('cleans terminal escape sequences and keeps raw output available', () => {
+    sessionAuditService.listRecords.mockReturnValueOnce(of({ records: [records[0], noisyOutputRecord] }));
+
+    component.selectSession(session);
+
+    const group = component.commandGroups[0];
+    expect(group.rawOutputText).toContain('\x1b[31m');
+    expect(group.outputText).toContain('red');
+    expect(group.outputText).toContain('new');
+    expect(group.outputText).toContain('progress 100%');
+    expect(group.outputText).not.toContain('\x1b');
+    expect(component.displayOutput(group)).toBe(group.outputText);
+
+    component.setOutputViewMode(group, 'raw');
+
+    expect(component.displayOutput(group)).toBe(group.rawOutputText);
+  });
+
+  it('strips OSC title controls from cleaned terminal text', () => {
+    const cleaned = component.cleanTerminalText('\x1b]0;secret title\x07ready\r\ndone');
+
+    expect(cleaned).toContain('ready');
+    expect(cleaned).toContain('done');
+    expect(cleaned).not.toContain('secret title');
+    expect(cleaned).not.toContain('\x1b');
+  });
+
   it('applies filters when searching', () => {
     component.filters.userId = 'user-2';
     component.applyFilters();
@@ -148,7 +189,7 @@ describe('SessionAudit', () => {
     component.recordFilters.hostId = 'host-1';
     component.applyRecordFilters();
     expect(sessionAuditService.listAuditRecords).toHaveBeenLastCalledWith(
-      expect.objectContaining({ hostId: 'host-1', limit: 100 }),
+      expect.objectContaining({ hostId: 'host-1', recordType: 'command', limit: 100 }),
     );
 
     component.agentFilters.incidentId = 'inc-1';
@@ -162,6 +203,55 @@ describe('SessionAudit', () => {
     expect(incidentAgentService.list).toHaveBeenLastCalledWith(
       expect.objectContaining({ incidentId: 'inc-1', limit: 50 }),
     );
+  });
+
+  it('uses command records as the default SSH record search and reset state', () => {
+    expect(component.recordFilters.recordType).toBe('command');
+
+    component.applyRecordFilters();
+
+    expect(sessionAuditService.listAuditRecords).toHaveBeenLastCalledWith(
+      expect.objectContaining({ recordType: 'command', limit: 100 }),
+    );
+
+    component.recordFilters.recordType = 'output';
+    component.recordFilters.hostId = 'host-1';
+    component.resetRecordFilters();
+
+    expect(component.recordFilters).toEqual({
+      sessionId: '',
+      userId: '',
+      hostId: '',
+      crId: '',
+      recordType: 'command',
+      from: '',
+      to: '',
+    });
+    expect(sessionAuditService.listAuditRecords).toHaveBeenLastCalledWith(
+      expect.objectContaining({ recordType: 'command', limit: 100 }),
+    );
+  });
+
+  it('shows readable previews for output records', () => {
+    const preview = component.recordBodyPreview(noisyOutputRecord);
+
+    expect(preview).toContain('red');
+    expect(preview).toContain('progress 100%');
+    expect(preview).not.toContain('\x1b');
+  });
+
+  it('opens a global record in the session timeline', () => {
+    component.sessions = [session];
+
+    component.openRecordTimeline(records[0]);
+
+    expect(component.activeTabIndex).toBe(0);
+    expect(component.filters.sessionId).toBe('sess-1');
+    expect(component.selectedSession?.sessionId).toBe('sess-1');
+    expect(sessionAuditService.listSessions).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sessionId: 'sess-1', limit: 50 }),
+    );
+    expect(sessionAuditService.listRecords).toHaveBeenLastCalledWith('sess-1', 100, undefined);
   });
 
   it('cross-links sessions to Agentic AI filters', () => {

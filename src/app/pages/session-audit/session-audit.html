@@ -118,7 +118,26 @@
                     </div>
                     <details class="output-block" [open]="group.outputs.length > 0">
                       <summary>Output</summary>
-                      <pre>{{ group.outputText }}</pre>
+                      <div class="output-toolbar">
+                        <button
+                          nz-button
+                          nzSize="small"
+                          [nzType]="outputViewMode(group) === 'clean' ? 'primary' : 'default'"
+                          (click)="setOutputViewMode(group, 'clean')">
+                          Clean
+                        </button>
+                        <button
+                          nz-button
+                          nzSize="small"
+                          [nzType]="outputViewMode(group) === 'raw' ? 'primary' : 'default'"
+                          (click)="setOutputViewMode(group, 'raw')">
+                          Raw
+                        </button>
+                      </div>
+                      <pre *ngIf="displayOutput(group); else emptyOutput">{{ displayOutput(group) }}</pre>
+                      <ng-template #emptyOutput>
+                        <div class="empty-output">No readable output retained for this command.</div>
+                      </ng-template>
                     </details>
                   </article>
                 </div>
@@ -187,19 +206,27 @@
                   <th>User</th>
                   <th>Host</th>
                   <th>Body</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
                 <tr *ngFor="let record of recordTable.data">
                   <td>{{ record.createdAt | date:'MMM d, HH:mm:ss' }}</td>
                   <td><nz-tag>{{ record.recordType }}</nz-tag></td>
-                  <td class="mono">{{ record.sessionId }}</td>
-                  <td>{{ record.userId }}</td>
+                  <td class="record-session-cell">
+                    <div class="mono compact-id">{{ record.sessionId }}</div>
+                    <div class="record-context">{{ recordSequenceContext(record) }}</div>
+                  </td>
+                  <td><span class="compact-id">{{ record.userId }}</span></td>
                   <td>{{ record.hostId }}</td>
                   <td class="log-body">
-                    <code *ngIf="record.recordType === 'command' || record.recordType === 'session_event'">{{ record.commandText || '-' }}</code>
-                    <span *ngIf="record.recordType === 'output'">{{ record.byteCount }} bytes output</span>
+                    <code>{{ recordBodyPreview(record) }}</code>
                     <nz-tag *ngIf="record.truncated" nzColor="orange">TRUNCATED</nz-tag>
+                  </td>
+                  <td>
+                    <button nz-button nzSize="small" nzType="link" (click)="openRecordTimeline(record)">
+                      Open timeline
+                    </button>
                   </td>
                 </tr>
               </tbody>

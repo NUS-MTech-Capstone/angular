@@ -84,6 +84,12 @@
   word-break: break-all;
 }
 
+.compact-id {
+  display: inline-block;
+  max-width: 220px;
+  overflow-wrap: anywhere;
+}
+
 .record-header {
   display: flex;
   align-items: flex-start;
@@ -152,6 +158,13 @@
   font-weight: 600;
 }
 
+.output-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 8px;
+}
+
 .output-block pre {
   max-height: 420px;
   overflow: auto;
@@ -166,13 +179,25 @@
   word-break: break-word;
 }
 
+.empty-output {
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px dashed #d7dde8;
+  border-radius: 6px;
+  color: #667085;
+  background: #f8fafc;
+  font-size: 12px;
+}
+
 .load-more {
   width: 100%;
   margin-top: 12px;
 }
 
 .log-body {
-  max-width: 360px;
+  width: 36%;
+  min-width: 260px;
+  max-width: 520px;
 }
 
 .log-body code,
@@ -186,6 +211,18 @@
   color: #667085;
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 12px;
+}
+
+.record-session-cell {
+  min-width: 220px;
+}
+
+.record-context {
+  margin-top: 4px;
+  color: #667085;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+  overflow-wrap: anywhere;
 }
 
 .agentic-grid {
@@ -237,6 +274,11 @@
   .record-search,
   .agentic-filters {
     grid-template-columns: 1fr;
+  }
+
+  .log-body,
+  .record-session-cell {
+    min-width: 180px;
   }
 
   .command-line {

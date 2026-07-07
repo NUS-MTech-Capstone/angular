@@ -30,15 +30,43 @@ import {
 } from '../../services/session-audit.service';
 
 interface CommandGroup {
+  id: string;
   command: SessionAuditRecord;
   outputs: SessionAuditRecord[];
   controls: SessionAuditRecord[];
   outputText: string;
+  rawOutputText: string;
   outputBytes: number;
   hasTruncatedOutput: boolean;
 }
 
+type OutputViewMode = 'clean' | 'raw';
+
+interface RecordFilters {
+  sessionId: string;
+  userId: string;
+  hostId: string;
+  crId: string;
+  recordType: SessionAuditRecord['recordType'] | '';
+  from: string;
+  to: string;
+}
+
 const SESSION_RECORD_LIMIT = 100;
+const DEFAULT_RECORD_TYPE: SessionAuditRecord['recordType'] = 'command';
+const EMPTY_OUTPUT = 'No readable output retained for this record.';
+
+function defaultRecordFilters(): RecordFilters {
+  return {
+    sessionId: '',
+    userId: '',
+    hostId: '',
+    crId: '',
+    recordType: DEFAULT_RECORD_TYPE,
+    from: '',
+    to: '',
+  };
+}
 
 @Component({
   selector: 'app-session-audit',
@@ -111,15 +139,7 @@ export class SessionAudit implements OnInit {
     from: '',
     to: '',
   };
-  recordFilters = {
-    sessionId: '',
-    userId: '',
-    hostId: '',
-    crId: '',
-    recordType: '',
-    from: '',
-    to: '',
-  };
+  recordFilters = defaultRecordFilters();
   agentFilters = {
     incidentId: '',
     alertId: '',
@@ -152,6 +172,7 @@ export class SessionAudit implements OnInit {
   nextAgentEventCursor?: string;
   nextAgentAlertCursor?: string;
   nextAgentIncidentCursor?: string;
+  outputViewModes: Record<string, OutputViewMode> = {};
   private hasLoadedSshSessions = false;
   private hasLoadedAgenticAudit = false;
 
@@ -175,7 +196,7 @@ export class SessionAudit implements OnInit {
     }
   }
 
-  loadSessions(cursor?: string): void {
+  loadSessions(cursor?: string, keepSelected = false): void {
     this.isLoadingSessions = true;
     this.sessionAudit.listSessions({
       sessionId: this.filters.sessionId || undefined,
@@ -193,9 +214,15 @@ export class SessionAudit implements OnInit {
         this.nextSessionCursor = response.nextCursor;
         this.isLoadingSessions = false;
         this.hasLoadedSshSessions = true;
-        if (!cursor) {
+        if (!cursor && !keepSelected) {
           this.selectedSession = null;
           this.setRecords([]);
+        }
+        if (!cursor && keepSelected && this.selectedSession) {
+          const refreshedSelection = sessions.find((session) => session.sessionId === this.selectedSession?.sessionId);
+          if (refreshedSelection) {
+            this.selectedSession = refreshedSelection;
+          }
         }
       },
       error: (err) => {
@@ -319,7 +346,7 @@ export class SessionAudit implements OnInit {
   }
 
   resetRecordFilters(): void {
-    this.recordFilters = { sessionId: '', userId: '', hostId: '', crId: '', recordType: '', from: '', to: '' };
+    this.recordFilters = defaultRecordFilters();
     this.loadAuditRecords();
   }
 
@@ -395,10 +422,12 @@ export class SessionAudit implements OnInit {
       if (record.recordType === 'command') {
         const id = record.commandId || `seq-${record.sequence}`;
         groups.set(id, {
+          id,
           command: record,
           outputs: [],
           controls: [],
           outputText: '',
+          rawOutputText: '',
           outputBytes: 0,
           hasTruncatedOutput: false,
         });
@@ -420,6 +449,7 @@ export class SessionAudit implements OnInit {
     const result = [...groups.values()];
     if (orphanOutputs.length > 0) {
       result.unshift({
+        id: 'startup-output',
         command: {
           ...orphanOutputs[0],
           recordType: 'command',
@@ -429,12 +459,14 @@ export class SessionAudit implements OnInit {
         outputs: orphanOutputs,
         controls: [],
         outputText: '',
+        rawOutputText: '',
         outputBytes: 0,
         hasTruncatedOutput: false,
       });
     }
     for (const group of result) {
-      group.outputText = this.outputText(group.outputs);
+      group.rawOutputText = this.rawOutputText(group.outputs);
+      group.outputText = this.cleanTerminalText(group.rawOutputText);
       group.outputBytes = this.outputBytes(group.outputs);
       group.hasTruncatedOutput = this.hasTruncated(group.outputs);
     }
@@ -442,6 +474,10 @@ export class SessionAudit implements OnInit {
   }
 
   outputText(records: SessionAuditRecord[]): string {
+    return this.cleanTerminalText(this.rawOutputText(records));
+  }
+
+  rawOutputText(records: SessionAuditRecord[]): string {
     return records.map((record) => this.decodeOutput(record.outputDataBase64 ?? '')).join('');
   }
 
@@ -451,6 +487,65 @@ export class SessionAudit implements OnInit {
 
   hasTruncated(records: SessionAuditRecord[]): boolean {
     return records.some((record) => record.truncated);
+  }
+
+  outputViewMode(group: CommandGroup): OutputViewMode {
+    return this.outputViewModes[group.id] ?? 'clean';
+  }
+
+  setOutputViewMode(group: CommandGroup, mode: OutputViewMode): void {
+    this.outputViewModes[group.id] = mode;
+  }
+
+  displayOutput(group: CommandGroup): string {
+    return this.outputViewMode(group) === 'raw' ? group.rawOutputText : group.outputText;
+  }
+
+  recordBodyPreview(record: SessionAuditRecord): string {
+    if (record.recordType === 'command' || record.recordType === 'session_event') {
+      return record.commandText || '-';
+    }
+    if (record.recordType === 'control') {
+      return record.commandText || 'control event';
+    }
+    const preview = this.outputText([record]).trim();
+    return preview ? this.truncate(preview, 240) : `${record.byteCount} bytes output (${EMPTY_OUTPUT})`;
+  }
+
+  recordSequenceContext(record: SessionAuditRecord): string {
+    const parts = [`seq ${record.sequence}`];
+    if (record.commandId) {
+      parts.push(record.commandId);
+    }
+    return parts.join(' - ');
+  }
+
+  openRecordTimeline(record: SessionAuditRecord): void {
+    this.activeTabIndex = 0;
+    this.filters = {
+      sessionId: record.sessionId,
+      userId: '',
+      hostId: '',
+      crId: '',
+      from: '',
+      to: '',
+    };
+    this.selectedSession = this.sessions.find((session) => session.sessionId === record.sessionId) ?? {
+      sessionId: record.sessionId,
+      userId: record.userId,
+      hostId: record.hostId,
+      crId: record.crId,
+      connectionType: 'ssh',
+      status: 'UNKNOWN',
+      createdAt: record.createdAt,
+      lastAuditAt: record.createdAt,
+      recordCount: 0,
+      truncated: record.truncated,
+    };
+    this.records = [];
+    this.nextRecordCursor = undefined;
+    this.loadSessions(undefined, true);
+    this.loadRecords();
   }
 
   searchAgenticForSession(session: AuditSessionSummary): void {
@@ -464,6 +559,7 @@ export class SessionAudit implements OnInit {
 
   searchSshForAlert(alert: ManagedAlert): void {
     this.activeTabIndex = 0;
+    this.recordFilters.recordType = DEFAULT_RECORD_TYPE;
     this.recordFilters.hostId = alert.hostId;
     this.recordFilters.from = this.toLocalInput(this.windowStart(alert.occurredAt));
     this.recordFilters.to = this.toLocalInput(this.windowEnd(alert.occurredAt));
@@ -473,6 +569,7 @@ export class SessionAudit implements OnInit {
 
   searchSshForIncident(incident: IncidentSummary): void {
     this.activeTabIndex = 0;
+    this.recordFilters.recordType = DEFAULT_RECORD_TYPE;
     this.recordFilters.hostId = incident.hostId;
     this.recordFilters.from = this.toLocalInput(this.windowStart(incident.createdAt));
     this.recordFilters.to = this.toLocalInput(this.windowEnd(incident.updatedAt));
@@ -485,6 +582,53 @@ export class SessionAudit implements OnInit {
       return '';
     }
     return JSON.stringify(value);
+  }
+
+  cleanTerminalText(value: string): string {
+    const withoutEscapes = value
+      .replace(/\x1b\][\s\S]*?(?:\x07|\x1b\\)/g, '')
+      .replace(/\x1b[P^_][\s\S]*?\x1b\\/g, '')
+      .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '')
+      .replace(/\x1b[()][A-Za-z0-9]/g, '')
+      .replace(/\x1b[=>]/g, '');
+    const lines = [''];
+    let column = 0;
+
+    for (const char of withoutEscapes) {
+      const code = char.charCodeAt(0);
+      if (char === '\r') {
+        column = 0;
+        continue;
+      }
+      if (char === '\n') {
+        lines.push('');
+        column = 0;
+        continue;
+      }
+      if (char === '\b' || char === '\x7f') {
+        if (column > 0) {
+          const line = lines[lines.length - 1];
+          lines[lines.length - 1] = line.slice(0, column - 1) + line.slice(column);
+          column -= 1;
+        }
+        continue;
+      }
+      if (char === '\t') {
+        const spaces = 4 - (column % 4);
+        for (let i = 0; i < spaces; i += 1) {
+          this.writeTerminalChar(lines, column, ' ');
+          column += 1;
+        }
+        continue;
+      }
+      if (code < 32 || code === 127 || (code >= 128 && code <= 159)) {
+        continue;
+      }
+      this.writeTerminalChar(lines, column, char);
+      column += 1;
+    }
+
+    return lines.join('\n').replace(/[ \t]+\n/g, '\n').replace(/[ \t]+$/g, '');
   }
 
   private decodeOutput(value: string): string {
@@ -524,6 +668,7 @@ export class SessionAudit implements OnInit {
     this.recordFilters.hostId = params.get('hostId') ?? '';
     this.recordFilters.from = this.fromIsoParam(params.get('from'));
     this.recordFilters.to = this.fromIsoParam(params.get('to'));
+    this.recordFilters.recordType = this.fromRecordTypeParam(params.get('recordType'));
     this.agentFilters.hostId = params.get('hostId') ?? '';
     this.agentFilters.incidentId = params.get('incidentId') ?? '';
     this.agentFilters.alertId = params.get('alertId') ?? '';
@@ -537,18 +682,54 @@ export class SessionAudit implements OnInit {
     return Number.isNaN(date.getTime()) ? '' : this.toLocalInput(date);
   }
 
+  private fromRecordTypeParam(value: string | null): SessionAuditRecord['recordType'] {
+    if (
+      value === 'command' ||
+      value === 'output' ||
+      value === 'control' ||
+      value === 'session_event'
+    ) {
+      return value;
+    }
+    return DEFAULT_RECORD_TYPE;
+  }
+
   private hasSshRecordFilters(): boolean {
-    return Object.values(this.recordFilters).some((value) => value !== '');
+    return Boolean(
+      this.recordFilters.sessionId ||
+      this.recordFilters.userId ||
+      this.recordFilters.hostId ||
+      this.recordFilters.crId ||
+      this.recordFilters.from ||
+      this.recordFilters.to ||
+      this.recordFilters.recordType !== DEFAULT_RECORD_TYPE,
+    );
   }
 
   private sshQueryParams(): Record<string, string> {
     const params: Record<string, string> = { tab: 'ssh' };
     if (this.recordFilters.hostId) params['hostId'] = this.recordFilters.hostId;
+    if (this.recordFilters.recordType && this.recordFilters.recordType !== DEFAULT_RECORD_TYPE) {
+      params['recordType'] = this.recordFilters.recordType;
+    }
     const from = this.toIso(this.recordFilters.from);
     const to = this.toIso(this.recordFilters.to);
     if (from) params['from'] = from;
     if (to) params['to'] = to;
     return params;
+  }
+
+  private truncate(value: string, maxLength: number): string {
+    return value.length <= maxLength ? value : `${value.slice(0, maxLength - 3)}...`;
+  }
+
+  private writeTerminalChar(lines: string[], column: number, char: string): void {
+    const line = lines[lines.length - 1];
+    if (column >= line.length) {
+      lines[lines.length - 1] = line.padEnd(column, ' ') + char;
+      return;
+    }
+    lines[lines.length - 1] = line.slice(0, column) + char + line.slice(column + 1);
   }
 
   private agenticQueryParams(): Record<string, string> {
