@@ -65,6 +65,17 @@ interface AuditRecordSearchRow {
   truncated: boolean;
 }
 
+type TimelineEntryType = 'command' | 'control' | 'session_event';
+
+interface TimelineEntry {
+  key: string;
+  type: TimelineEntryType;
+  sequence: number;
+  createdAt: string;
+  group?: CommandGroup;
+  record?: SessionAuditRecord;
+}
+
 const SESSION_RECORD_LIMIT = 100;
 const DEFAULT_RECORD_TYPE: SessionAuditRecord['recordType'] | '' = '';
 const EMPTY_OUTPUT = 'No readable output retained for this record.';
@@ -171,6 +182,7 @@ export class SessionAudit implements OnInit {
   selectedSession: AuditSessionSummary | null = null;
   records: SessionAuditRecord[] = [];
   commandGroups: CommandGroup[] = [];
+  timelineEntries: TimelineEntry[] = [];
   sessionEventRecords: SessionAuditRecord[] = [];
   auditRecords: SessionAuditRecord[] = [];
   auditRecordRows: AuditRecordSearchRow[] = [];
@@ -210,9 +222,6 @@ export class SessionAudit implements OnInit {
       return;
     }
     this.loadSessions();
-    if (this.hasSshRecordFilters()) {
-      this.loadAuditRecords();
-    }
   }
 
   loadSessions(cursor?: string, keepSelected = false): void {
@@ -433,6 +442,7 @@ export class SessionAudit implements OnInit {
     this.records = records;
     this.commandGroups = this.buildCommandGroups(records);
     this.sessionEventRecords = records.filter((record) => record.recordType === 'session_event');
+    this.timelineEntries = this.buildTimelineEntries(records, this.commandGroups);
   }
 
   private buildCommandGroups(records: SessionAuditRecord[]): CommandGroup[] {
@@ -500,6 +510,45 @@ export class SessionAudit implements OnInit {
     return result;
   }
 
+  private buildTimelineEntries(records: SessionAuditRecord[], groups: CommandGroup[]): TimelineEntry[] {
+    const entries: TimelineEntry[] = groups.map((group) => ({
+      key: `command:${group.id}`,
+      type: 'command',
+      sequence: group.command.sequence,
+      createdAt: group.command.createdAt,
+      group,
+    }));
+    for (const record of records) {
+      if (record.recordType !== 'session_event' && record.recordType !== 'control') {
+        continue;
+      }
+      entries.push({
+        key: `${record.recordType}:${record.sequence}:${record.commandId || ''}`,
+        type: record.recordType === 'control' ? 'control' : 'session_event',
+        sequence: record.sequence,
+        createdAt: record.createdAt,
+        record,
+      });
+    }
+    return entries.sort((a, b) => {
+      if (a.sequence !== b.sequence) {
+        return a.sequence - b.sequence;
+      }
+      return this.timelineTypeOrder(a.type) - this.timelineTypeOrder(b.type);
+    });
+  }
+
+  private timelineTypeOrder(type: TimelineEntryType): number {
+    switch (type) {
+      case 'session_event':
+        return 0;
+      case 'command':
+        return 1;
+      case 'control':
+        return 2;
+    }
+  }
+
   outputText(records: SessionAuditRecord[]): string {
     return this.cleanTerminalText(this.rawOutputText(records));
   }
@@ -526,6 +575,41 @@ export class SessionAudit implements OnInit {
 
   displayOutput(group: CommandGroup): string {
     return this.outputViewMode(group) === 'raw' ? group.rawOutputText : group.outputText;
+  }
+
+  timelineEventText(entry: TimelineEntry): string {
+    if (entry.group) {
+      return entry.group.command.commandText || 'Command';
+    }
+    if (!entry.record) {
+      return '';
+    }
+    if (entry.record.recordType === 'control') {
+      return entry.record.commandText || 'Control event';
+    }
+    return entry.record.commandText || 'Session event';
+  }
+
+  timelineEventTag(entry: TimelineEntry): string {
+    switch (entry.type) {
+      case 'command':
+        return entry.group?.id === 'startup-output' ? 'Terminal output' : 'Command';
+      case 'control':
+        return 'Control';
+      case 'session_event':
+        return 'Session event';
+    }
+  }
+
+  timelineEventIcon(entry: TimelineEntry): string {
+    switch (entry.type) {
+      case 'command':
+        return 'snippets';
+      case 'control':
+        return 'warning';
+      case 'session_event':
+        return 'audit';
+    }
   }
 
   recordBodyPreview(record: SessionAuditRecord): string {
@@ -586,21 +670,19 @@ export class SessionAudit implements OnInit {
 
   searchSshForAlert(alert: ManagedAlert): void {
     this.activeTabIndex = 0;
-    this.recordFilters.recordType = DEFAULT_RECORD_TYPE;
-    this.recordFilters.hostId = alert.hostId;
-    this.recordFilters.from = this.toLocalInput(this.windowStart(alert.occurredAt));
-    this.recordFilters.to = this.toLocalInput(this.windowEnd(alert.occurredAt));
-    this.loadAuditRecords();
+    this.filters.hostId = alert.hostId;
+    this.filters.from = this.toLocalInput(this.windowStart(alert.occurredAt));
+    this.filters.to = this.toLocalInput(this.windowEnd(alert.occurredAt));
+    this.loadSessions();
     this.router.navigate(['/audit'], { queryParams: this.sshQueryParams() });
   }
 
   searchSshForIncident(incident: IncidentSummary): void {
     this.activeTabIndex = 0;
-    this.recordFilters.recordType = DEFAULT_RECORD_TYPE;
-    this.recordFilters.hostId = incident.hostId;
-    this.recordFilters.from = this.toLocalInput(this.windowStart(incident.createdAt));
-    this.recordFilters.to = this.toLocalInput(this.windowEnd(incident.updatedAt));
-    this.loadAuditRecords();
+    this.filters.hostId = incident.hostId;
+    this.filters.from = this.toLocalInput(this.windowStart(incident.createdAt));
+    this.filters.to = this.toLocalInput(this.windowEnd(incident.updatedAt));
+    this.loadSessions();
     this.router.navigate(['/audit'], { queryParams: this.sshQueryParams() });
   }
 
@@ -912,6 +994,10 @@ export class SessionAudit implements OnInit {
         '$1\n$2',
       );
     }
+    formatted = formatted.replace(
+      /(["'])(ls|cd|pwd|cat|grep|tail|head)(?=\s)/g,
+      '$1\n$2',
+    );
     return formatted;
   }
 
@@ -983,10 +1069,9 @@ export class SessionAudit implements OnInit {
   private applyInitialQueryParams(): void {
     const params = this.route.snapshot.queryParamMap;
     this.activeTabIndex = params.get('tab') === 'agentic' ? 1 : 0;
-    this.recordFilters.hostId = params.get('hostId') ?? '';
-    this.recordFilters.from = this.fromIsoParam(params.get('from'));
-    this.recordFilters.to = this.fromIsoParam(params.get('to'));
-    this.recordFilters.recordType = this.fromRecordTypeParam(params.get('recordType'));
+    this.filters.hostId = params.get('hostId') ?? '';
+    this.filters.from = this.fromIsoParam(params.get('from'));
+    this.filters.to = this.fromIsoParam(params.get('to'));
     this.agentFilters.hostId = params.get('hostId') ?? '';
     this.agentFilters.incidentId = params.get('incidentId') ?? '';
     this.agentFilters.alertId = params.get('alertId') ?? '';
@@ -1000,38 +1085,11 @@ export class SessionAudit implements OnInit {
     return Number.isNaN(date.getTime()) ? '' : this.toLocalInput(date);
   }
 
-  private fromRecordTypeParam(value: string | null): SessionAuditRecord['recordType'] | '' {
-    if (
-      value === 'command' ||
-      value === 'output' ||
-      value === 'control' ||
-      value === 'session_event'
-    ) {
-      return value;
-    }
-    return '';
-  }
-
-  private hasSshRecordFilters(): boolean {
-    return Boolean(
-      this.recordFilters.sessionId ||
-      this.recordFilters.userId ||
-      this.recordFilters.hostId ||
-      this.recordFilters.crId ||
-      this.recordFilters.from ||
-      this.recordFilters.to ||
-      this.recordFilters.recordType !== DEFAULT_RECORD_TYPE,
-    );
-  }
-
   private sshQueryParams(): Record<string, string> {
     const params: Record<string, string> = { tab: 'ssh' };
-    if (this.recordFilters.hostId) params['hostId'] = this.recordFilters.hostId;
-    if (this.recordFilters.recordType && this.recordFilters.recordType !== DEFAULT_RECORD_TYPE) {
-      params['recordType'] = this.recordFilters.recordType;
-    }
-    const from = this.toIso(this.recordFilters.from);
-    const to = this.toIso(this.recordFilters.to);
+    if (this.filters.hostId) params['hostId'] = this.filters.hostId;
+    const from = this.toIso(this.filters.from);
+    const to = this.toIso(this.filters.to);
     if (from) params['from'] = from;
     if (to) params['to'] = to;
     return params;

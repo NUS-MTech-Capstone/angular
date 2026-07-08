@@ -110,7 +110,7 @@
             <ng-container *ngIf="selectedSession; else noSessionSelected">
               <div class="record-header">
                 <div>
-                  <div class="section-title">Command Timeline</div>
+                  <div class="section-title">Timeline</div>
                   <div class="context-chip-row">
                     <button
                       type="button"
@@ -147,19 +147,20 @@
               </nz-alert>
 
               <nz-spin [nzSpinning]="isLoadingRecords">
-                <div *ngIf="commandGroups.length > 0; else noRecords" class="timeline">
-                  <article class="command-entry" *ngFor="let group of commandGroups">
+                <div *ngIf="timelineEntries.length > 0; else noRecords" class="timeline">
+                  <article class="command-entry" *ngFor="let entry of timelineEntries">
                     <div class="command-line">
-                      <span nz-icon nzType="snippets" nzTheme="outline"></span>
-                      <code>{{ group.command.commandText }}</code>
-                      <span class="timestamp">{{ group.command.createdAt | date:'HH:mm:ss' }}</span>
+                      <span nz-icon [nzType]="timelineEventIcon(entry)" nzTheme="outline"></span>
+                      <code>{{ timelineEventText(entry) }}</code>
+                      <span class="timestamp">{{ entry.createdAt | date:'HH:mm:ss' }}</span>
                     </div>
                     <div class="command-meta">
-                      <span>{{ group.outputBytes }} bytes output</span>
-                      <nz-tag *ngIf="group.hasTruncatedOutput" nzColor="orange">TRUNCATED</nz-tag>
-                      <nz-tag *ngIf="group.controls.length > 0" nzColor="red">CONTROL</nz-tag>
+                      <nz-tag>{{ timelineEventTag(entry) }}</nz-tag>
+                      <span *ngIf="entry.group">{{ entry.group.outputBytes }} bytes output</span>
+                      <span *ngIf="entry.record" class="mono">seq {{ entry.record.sequence }}</span>
+                      <nz-tag *ngIf="entry.group?.hasTruncatedOutput" nzColor="orange">TRUNCATED</nz-tag>
                     </div>
-                    <details class="output-block" [open]="group.outputs.length > 0">
+                    <details *ngIf="entry.group as group" class="output-block" [open]="group.outputs.length > 0">
                       <summary>Output</summary>
                       <div class="output-toolbar">
                         <button
@@ -198,13 +199,6 @@
                 Load more records
               </button>
 
-              <div class="session-events" *ngIf="sessionEventRecords.length > 0">
-                <div class="section-title">Session Events</div>
-                <div class="event-row" *ngFor="let event of sessionEventRecords">
-                  <span>{{ event.createdAt | date:'HH:mm:ss' }}</span>
-                  <span>{{ event.commandText }}</span>
-                </div>
-              </div>
             </ng-container>
 
             <ng-template #noSessionSelected>
@@ -213,98 +207,6 @@
           </section>
         </div>
 
-        <section class="wide-panel">
-          <div class="section-title">SSH Record Search</div>
-          <div class="filters record-search">
-            <input nz-input placeholder="Session ID" [(ngModel)]="recordFilters.sessionId" (keyup.enter)="applyRecordFilters()" />
-            <input nz-input placeholder="User ID" [(ngModel)]="recordFilters.userId" (keyup.enter)="applyRecordFilters()" />
-            <input nz-input placeholder="Host ID" [(ngModel)]="recordFilters.hostId" (keyup.enter)="applyRecordFilters()" />
-            <input nz-input placeholder="CR ID" [(ngModel)]="recordFilters.crId" (keyup.enter)="applyRecordFilters()" />
-            <nz-select nzAllowClear nzPlaceHolder="Record type" [(ngModel)]="recordFilters.recordType">
-              <nz-option nzValue="" nzLabel="All"></nz-option>
-              <nz-option nzValue="output" nzLabel="Terminal output"></nz-option>
-              <nz-option nzValue="command" nzLabel="Commands"></nz-option>
-              <nz-option nzValue="session_event" nzLabel="Session events"></nz-option>
-              <nz-option nzValue="control" nzLabel="Controls"></nz-option>
-            </nz-select>
-            <input nz-input type="datetime-local" [(ngModel)]="recordFilters.from" aria-label="Record from" />
-            <input nz-input type="datetime-local" [(ngModel)]="recordFilters.to" aria-label="Record to" />
-            <button nz-button nzType="primary" (click)="applyRecordFilters()">
-              <span nz-icon nzType="search" nzTheme="outline"></span>
-              Search
-            </button>
-            <button nz-button nzType="default" (click)="resetRecordFilters()">Reset</button>
-          </div>
-          <div class="filter-hint">Older retained sessions may only have terminal output records.</div>
-          <nz-spin [nzSpinning]="isLoadingAuditRecords">
-            <nz-table
-              #recordTable
-              nzSize="small"
-              [nzData]="auditRecordRows"
-              [nzFrontPagination]="false"
-              [nzShowPagination]="false"
-              [nzNoResult]="sshRecordEmpty">
-              <thead>
-                <tr>
-                  <th>Time</th>
-                  <th>Type</th>
-                  <th>Session</th>
-                  <th>User</th>
-                  <th>Host</th>
-                  <th>Body</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr *ngFor="let row of recordTable.data">
-                  <td>{{ row.primary.createdAt | date:'MMM d, HH:mm:ss' }}</td>
-                  <td><nz-tag>{{ recordTypeLabel(row.primary.recordType) }}</nz-tag></td>
-                  <td class="record-session-cell">
-                    <button
-                      type="button"
-                      class="copy-chip mono"
-                      [title]="row.primary.sessionId"
-                      (click)="copyValue(row.primary.sessionId, $event)">
-                      {{ compactId(row.primary.sessionId) }}
-                    </button>
-                    <div class="record-context">{{ rowSequenceContext(row) }}</div>
-                  </td>
-                  <td>
-                    <div>{{ displayUser(row.primary.userId) }}</div>
-                    <button
-                      type="button"
-                      class="copy-chip muted mono"
-                      [title]="row.primary.userId"
-                      (click)="copyValue(row.primary.userId, $event)">
-                      {{ compactId(row.primary.userId) }}
-                    </button>
-                  </td>
-                  <td>{{ row.primary.hostId }}</td>
-                  <td class="log-body">
-                    <code>{{ rowBodyPreview(row) }}</code>
-                    <nz-tag *ngIf="row.truncated" nzColor="orange">TRUNCATED</nz-tag>
-                  </td>
-                  <td>
-                    <button nz-button nzSize="small" nzType="link" (click)="openRecordTimeline(row.primary)">
-                      Open timeline
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </nz-table>
-            <ng-template #sshRecordEmpty>
-              <nz-empty nzNotFoundContent="No SSH audit records found"></nz-empty>
-            </ng-template>
-          </nz-spin>
-          <button
-            *ngIf="nextAuditRecordCursor"
-            nz-button
-            nzType="default"
-            class="load-more"
-            (click)="loadAuditRecords(nextAuditRecordCursor)">
-            Load more records
-          </button>
-        </section>
       </div>
     </nz-tab>
 

@@ -161,7 +161,76 @@ describe('SessionAudit', () => {
     expect(groups.length).toBe(1);
     expect(groups[0].command.commandText).toBe('pwd');
     expect(groups[0].outputText).toContain('/home/ubuntu');
+    expect(component.timelineEntries.map((entry) => entry.type)).toEqual(['command']);
     expect(sessionAuditService.listRecords).toHaveBeenCalledWith('sess-1', 100, undefined);
+  });
+
+  it('builds one ordered timeline with lifecycle events, commands, and controls', () => {
+    const timelineRecords: SessionAuditRecord[] = [
+      {
+        ...records[0],
+        recordType: 'session_event',
+        sequence: 1,
+        commandId: undefined,
+        commandText: 'session started',
+        createdAt: '2026-07-01T00:00:00Z',
+      },
+      {
+        ...records[0],
+        sequence: 2,
+        commandId: 'cmd-1',
+        commandText: 'pwd',
+        createdAt: '2026-07-01T00:01:00Z',
+      },
+      {
+        ...records[1],
+        sequence: 3,
+        commandId: 'cmd-1',
+        createdAt: '2026-07-01T00:01:01Z',
+      },
+      {
+        ...records[0],
+        recordType: 'session_event',
+        sequence: 4,
+        commandId: undefined,
+        commandText: 'owner detached',
+        createdAt: '2026-07-01T00:02:00Z',
+      },
+      {
+        ...records[0],
+        recordType: 'session_event',
+        sequence: 5,
+        commandId: undefined,
+        commandText: 'owner rejoined',
+        createdAt: '2026-07-01T00:03:00Z',
+      },
+      {
+        ...records[0],
+        recordType: 'control',
+        sequence: 6,
+        commandId: 'cmd-1',
+        commandText: 'Ctrl-C',
+        createdAt: '2026-07-01T00:04:00Z',
+      },
+    ];
+    sessionAuditService.listRecords.mockReturnValueOnce(of({ records: timelineRecords }));
+
+    component.selectSession(session);
+
+    expect(component.timelineEntries.map((entry) => component.timelineEventText(entry))).toEqual([
+      'session started',
+      'pwd',
+      'owner detached',
+      'owner rejoined',
+      'Ctrl-C',
+    ]);
+    expect(component.timelineEntries.map((entry) => component.timelineEventTag(entry))).toEqual([
+      'Session event',
+      'Command',
+      'Session event',
+      'Session event',
+      'Control',
+    ]);
   });
 
   it('cleans terminal escape sequences and keeps raw output available', () => {
@@ -447,6 +516,25 @@ describe('SessionAudit', () => {
     expect(group.command.commandText).toBe('Terminal output');
     expect(group.outputText).toBe('ls -lrta\necho "test"');
     expect(group.rawOutputText).toBe('ls -lrtaecho "test"');
+  });
+
+  it('formats legacy orphan command echo across detach and rejoin boundaries', () => {
+    const orphanOnlyRecords: SessionAuditRecord[] = [
+      {
+        ...records[1],
+        sequence: 1,
+        commandId: undefined,
+        outputDataBase64: btoa('echo "hello1234"ls -lrt'),
+        byteCount: 22,
+      },
+    ];
+    sessionAuditService.listRecords.mockReturnValueOnce(of({ records: orphanOnlyRecords }));
+
+    component.selectSession(session);
+
+    const group = component.commandGroups[0];
+    expect(group.outputText).toBe('echo "hello1234"\nls -lrt');
+    expect(group.rawOutputText).toBe('echo "hello1234"ls -lrt');
   });
 
   it('renders collapsed orphan command echo as readable command lines in search rows', () => {
