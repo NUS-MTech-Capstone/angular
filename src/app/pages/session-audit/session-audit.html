@@ -57,9 +57,6 @@
                     </div>
                     <div class="session-card-actions">
                       <nz-tag [nzColor]="sessionStatusColor(session.status)">{{ session.status }}</nz-tag>
-                      <button nz-button nzSize="small" nzType="link" (click)="$event.stopPropagation(); searchAgenticForSession(session)">
-                        Logs
-                      </button>
                     </div>
                   </div>
 
@@ -141,9 +138,7 @@
                     <span class="context-chip">{{ selectedSession.hostId }}</span>
                   </div>
                 </div>
-                <nz-tag [nzColor]="selectedSession.truncated ? 'orange' : 'green'">
-                  {{ selectedSession.truncated ? 'TRUNCATED' : 'RETAINED' }}
-                </nz-tag>
+                <nz-tag *ngIf="selectedSession.truncated" nzColor="orange">TRUNCATED</nz-tag>
               </div>
 
               <nz-alert
@@ -164,7 +159,6 @@
                     <div class="command-meta">
                       <nz-tag>{{ timelineEventTag(entry) }}</nz-tag>
                       <span *ngIf="entry.group">{{ entry.group.outputBytes }} bytes output</span>
-                      <span *ngIf="entry.record" class="mono">seq {{ entry.record.sequence }}</span>
                       <nz-tag *ngIf="entry.group?.hasTruncatedOutput" nzColor="orange">TRUNCATED</nz-tag>
                     </div>
                     <details *ngIf="entry.group as group" class="output-block" [open]="group.outputs.length > 0">

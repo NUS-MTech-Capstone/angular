@@ -233,13 +233,14 @@ describe('SessionAudit', () => {
     ];
     sessionAuditService.listRecords.mockReturnValueOnce(of({ records: timelineRecords }));
 
+    component.ngOnInit();
     component.selectSession(session);
 
     expect(component.timelineEntries.map((entry) => component.timelineEventText(entry))).toEqual([
       'session started',
       'pwd',
-      'owner detached',
-      'owner rejoined',
+      'Alice Admin has left the session as owner',
+      'Alice Admin rejoined',
       'Ctrl-C',
     ]);
     expect(component.timelineEntries.map((entry) => component.timelineEventTag(entry))).toEqual([
@@ -617,16 +618,6 @@ describe('SessionAudit', () => {
       expect.objectContaining({ sessionId: 'sess-1', limit: 50 }),
     );
     expect(sessionAuditService.listRecords).toHaveBeenLastCalledWith('sess-1', 100, undefined);
-  });
-
-  it('cross-links sessions to Agentic AI filters', () => {
-    component.searchAgenticForSession(session);
-
-    expect(component.activeTabIndex).toBe(1);
-    expect(component.agentFilters.hostId).toBe('host-1');
-    expect(router.navigate).toHaveBeenCalledWith(['/audit'], expect.objectContaining({
-      queryParams: expect.objectContaining({ tab: 'agentic', hostId: 'host-1' }),
-    }));
   });
 
   it('loads the Agentic AI tab lazily', () => {

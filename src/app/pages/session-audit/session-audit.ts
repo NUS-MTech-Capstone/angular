@@ -618,7 +618,7 @@ export class SessionAudit implements OnInit {
     if (entry.record.recordType === 'control') {
       return entry.record.commandText || 'Control event';
     }
-    return entry.record.commandText || 'Session event';
+    return this.sessionLifecycleEventText(entry.record.commandText);
   }
 
   timelineEventTag(entry: TimelineEntry): string {
@@ -688,15 +688,6 @@ export class SessionAudit implements OnInit {
     this.nextRecordCursor = undefined;
     this.loadSessions(undefined, true);
     this.loadRecords();
-  }
-
-  searchAgenticForSession(session: AuditSessionSummary): void {
-    this.activeTabIndex = 1;
-    this.agentFilters.hostId = session.hostId;
-    this.agentFilters.from = this.toLocalInput(this.windowStart(session.createdAt));
-    this.agentFilters.to = this.toLocalInput(this.windowEnd(session.lastAuditAt));
-    this.loadAgenticAudit();
-    this.router.navigate(['/audit'], { queryParams: this.agenticQueryParams() });
   }
 
   searchSshForAlert(alert: ManagedAlert): void {
@@ -858,6 +849,18 @@ export class SessionAudit implements OnInit {
       display.set(user.sub, user.name || user.username || user.sub);
     }
     return display;
+  }
+
+  private sessionLifecycleEventText(commandText?: string): string {
+    const ownerName = this.selectedSession ? this.displayUser(this.selectedSession.userId) : 'Owner';
+    switch (commandText) {
+      case 'owner detached':
+        return `${ownerName} has left the session as owner`;
+      case 'owner rejoined':
+        return `${ownerName} rejoined`;
+      default:
+        return commandText || 'Session event';
+    }
   }
 
   private buildAuditRecordRows(records: SessionAuditRecord[]): AuditRecordSearchRow[] {
@@ -1150,13 +1153,4 @@ export class SessionAudit implements OnInit {
     lines[lines.length - 1] = line.slice(0, column) + char + line.slice(column + 1);
   }
 
-  private agenticQueryParams(): Record<string, string> {
-    const params: Record<string, string> = { tab: 'agentic' };
-    if (this.agentFilters.hostId) params['hostId'] = this.agentFilters.hostId;
-    const from = this.toIso(this.agentFilters.from);
-    const to = this.toIso(this.agentFilters.to);
-    if (from) params['from'] = from;
-    if (to) params['to'] = to;
-    return params;
-  }
 }
