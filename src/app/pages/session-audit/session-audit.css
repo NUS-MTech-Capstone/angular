@@ -123,6 +123,10 @@
   gap: 10px;
 }
 
+.session-filter-notice {
+  margin-bottom: 10px;
+}
+
 .session-card {
   cursor: pointer;
   border: 1px solid #e4e8f0;

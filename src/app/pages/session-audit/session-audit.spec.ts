@@ -135,6 +135,24 @@ describe('SessionAudit', () => {
     expect(incidentAgentService.listEvents).not.toHaveBeenCalled();
   });
 
+  it('falls back to recent sessions when filtered session query returns empty', () => {
+    sessionAuditService.listSessions
+      .mockReturnValueOnce(of({ sessions: [] }))
+      .mockReturnValueOnce(of({ sessions: [session] }));
+    component.filters.hostId = 'host-1';
+
+    component.applyFilters();
+
+    expect(sessionAuditService.listSessions).toHaveBeenCalledTimes(2);
+    expect(sessionAuditService.listSessions).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      hostId: 'host-1',
+      limit: 50,
+    }));
+    expect(sessionAuditService.listSessions).toHaveBeenNthCalledWith(2, { limit: 50 });
+    expect(component.sessions).toEqual([session]);
+    expect(component.sessionFilterNotice).toContain('showing recent audited sessions');
+  });
+
   it('treats null audit and agentic lists as empty', () => {
     sessionAuditService.listSessions.mockReturnValueOnce(of({ sessions: null } as any));
     sessionAuditService.listAuditRecords.mockReturnValueOnce(of({ records: null } as any));

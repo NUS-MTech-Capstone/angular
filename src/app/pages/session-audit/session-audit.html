@@ -30,6 +30,13 @@
         <div class="audit-layout">
           <section class="session-list">
             <div class="section-title">Sessions</div>
+            <nz-alert
+              *ngIf="sessionFilterNotice"
+              nzType="info"
+              nzShowIcon
+              [nzMessage]="sessionFilterNotice"
+              class="session-filter-notice">
+            </nz-alert>
             <nz-spin [nzSpinning]="isLoadingSessions">
               <div *ngIf="sessions.length > 0" class="session-card-list">
                 <article

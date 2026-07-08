@@ -189,6 +189,7 @@ export class SessionAudit implements OnInit {
   agentEvents: IncidentEvent[] = [];
   agentAlerts: ManagedAlert[] = [];
   agentIncidents: IncidentSummary[] = [];
+  sessionFilterNotice = '';
   isLoadingSessions = false;
   isLoadingRecords = false;
   isLoadingAuditRecords = false;
@@ -224,7 +225,7 @@ export class SessionAudit implements OnInit {
     this.loadSessions();
   }
 
-  loadSessions(cursor?: string, keepSelected = false): void {
+  loadSessions(cursor?: string, keepSelected = false, allowFallback = true): void {
     this.isLoadingSessions = true;
     this.sessionAudit.listSessions({
       sessionId: this.filters.sessionId || undefined,
@@ -238,9 +239,16 @@ export class SessionAudit implements OnInit {
     }).subscribe({
       next: (response) => {
         const sessions = response.sessions ?? [];
+        if (!cursor && allowFallback && sessions.length === 0 && this.hasSessionFilters()) {
+          this.loadRecentSessionsFallback(keepSelected);
+          return;
+        }
         this.sessions = cursor ? [...this.sessions, ...sessions] : sessions;
         this.nextSessionCursor = response.nextCursor;
         this.isLoadingSessions = false;
+        if (!cursor) {
+          this.sessionFilterNotice = '';
+        }
         this.hasLoadedSshSessions = true;
         if (!cursor && !keepSelected) {
           this.selectedSession = null;
@@ -251,6 +259,27 @@ export class SessionAudit implements OnInit {
           if (refreshedSelection) {
             this.selectedSession = refreshedSelection;
           }
+        }
+      },
+      error: (err) => {
+        this.isLoadingSessions = false;
+        this.message.error(`Failed to load session audit: ${err?.message ?? 'Unknown error'}`);
+      },
+    });
+  }
+
+  private loadRecentSessionsFallback(keepSelected: boolean): void {
+    this.sessionAudit.listSessions({ limit: 50 }).subscribe({
+      next: (response) => {
+        const sessions = response.sessions ?? [];
+        this.sessions = sessions;
+        this.nextSessionCursor = response.nextCursor;
+        this.isLoadingSessions = false;
+        this.hasLoadedSshSessions = true;
+        this.sessionFilterNotice = 'No audited sessions matched the current filters; showing recent audited sessions.';
+        if (!keepSelected) {
+          this.selectedSession = null;
+          this.setRecords([]);
         }
       },
       error: (err) => {
@@ -358,6 +387,7 @@ export class SessionAudit implements OnInit {
   }
 
   applyFilters(): void {
+    this.sessionFilterNotice = '';
     this.loadSessions();
   }
 
@@ -371,6 +401,7 @@ export class SessionAudit implements OnInit {
 
   resetFilters(): void {
     this.filters = { sessionId: '', userId: '', hostId: '', crId: '', from: '', to: '' };
+    this.sessionFilterNotice = '';
     this.loadSessions();
   }
 
@@ -1093,6 +1124,17 @@ export class SessionAudit implements OnInit {
     if (from) params['from'] = from;
     if (to) params['to'] = to;
     return params;
+  }
+
+  private hasSessionFilters(): boolean {
+    return Boolean(
+      this.filters.sessionId ||
+      this.filters.userId ||
+      this.filters.hostId ||
+      this.filters.crId ||
+      this.filters.from ||
+      this.filters.to,
+    );
   }
 
   private truncate(value: string, maxLength: number): string {
