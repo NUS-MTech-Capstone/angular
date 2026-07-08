@@ -491,7 +491,9 @@ export class SessionAudit implements OnInit {
     }
     for (const group of result) {
       group.rawOutputText = this.rawOutputText(group.outputs);
-      group.outputText = this.cleanCommandOutputText(group.outputs, group.command.commandText);
+      group.outputText = group.id === 'startup-output'
+        ? this.cleanOrphanOutputText(group.outputs, commandTexts)
+        : this.cleanCommandOutputText(group.outputs, group.command.commandText);
       group.outputBytes = this.outputBytes(group.outputs);
       group.hasTruncatedOutput = this.hasTruncated(group.outputs);
     }
@@ -840,13 +842,16 @@ export class SessionAudit implements OnInit {
 
   private cleanOrphanOutputText(records: SessionAuditRecord[], commandTexts: string[]): string {
     const clean = this.outputText(records).trim();
-    if (!clean || commandTexts.length === 0) {
+    if (!clean) {
       return clean;
+    }
+    if (commandTexts.length === 0) {
+      return this.formatLegacyOrphanEcho(clean);
     }
     if (this.isCommandEchoOnly(clean, commandTexts)) {
       return commandTexts.join('\n');
     }
-    return clean;
+    return this.formatLegacyOrphanEcho(clean);
   }
 
   private visibleOrphanOutputs(records: SessionAuditRecord[], commandTexts: string[]): SessionAuditRecord[] {
@@ -884,6 +889,30 @@ export class SessionAudit implements OnInit {
 
   private normalizeEchoText(value: string): string {
     return value.replace(/\s+/g, '');
+  }
+
+  private formatLegacyOrphanEcho(value: string): string {
+    const commandStarts = [
+      'echo',
+      'sudo',
+      'kubectl',
+      'docker',
+      'terraform',
+      'npm',
+      'python3',
+      'python',
+      'curl',
+      'dig',
+      'ssh',
+    ];
+    let formatted = value;
+    for (const command of commandStarts) {
+      formatted = formatted.replace(
+        new RegExp(`([^\\s;&|\\n])(${command})(?=\\s|["'])`, 'g'),
+        '$1\n$2',
+      );
+    }
+    return formatted;
   }
 
   private commandTextByID(records: SessionAuditRecord[]): Map<string, string> {

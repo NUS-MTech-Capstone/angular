@@ -429,6 +429,26 @@ describe('SessionAudit', () => {
     expect(component.commandGroups[0].outputText).toBe('login banner');
   });
 
+  it('formats legacy orphan command echo as readable lines without changing raw output', () => {
+    const orphanOnlyRecords: SessionAuditRecord[] = [
+      {
+        ...records[1],
+        sequence: 1,
+        commandId: undefined,
+        outputDataBase64: btoa('ls -lrtaecho "test"'),
+        byteCount: 20,
+      },
+    ];
+    sessionAuditService.listRecords.mockReturnValueOnce(of({ records: orphanOnlyRecords }));
+
+    component.selectSession(session);
+
+    const group = component.commandGroups[0];
+    expect(group.command.commandText).toBe('Terminal output');
+    expect(group.outputText).toBe('ls -lrta\necho "test"');
+    expect(group.rawOutputText).toBe('ls -lrtaecho "test"');
+  });
+
   it('renders collapsed orphan command echo as readable command lines in search rows', () => {
     const searchRecords: SessionAuditRecord[] = [
       {
