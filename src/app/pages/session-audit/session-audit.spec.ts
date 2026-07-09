@@ -178,7 +178,8 @@ describe('SessionAudit', () => {
     const groups = component.commandGroups;
     expect(groups.length).toBe(1);
     expect(groups[0].command.commandText).toBe('pwd');
-    expect(groups[0].outputText).toContain('/home/ubuntu');
+    expect(groups[0].outputHydrated).toBe(false);
+    expect(component.displayOutput(groups[0])).toContain('/home/ubuntu');
     expect(component.timelineEntries.map((entry) => entry.type)).toEqual(['command']);
     expect(sessionAuditService.listRecords).toHaveBeenCalledWith('sess-1', 100, undefined);
   });
@@ -236,14 +237,14 @@ describe('SessionAudit', () => {
     component.ngOnInit();
     component.selectSession(session);
 
-    expect(component.timelineEntries.map((entry) => component.timelineEventText(entry))).toEqual([
+    expect(component.timelineEntries.map((entry) => entry.text)).toEqual([
       'session started',
       'pwd',
       'Alice Admin has left the session as owner',
       'Alice Admin rejoined',
       'Ctrl-C',
     ]);
-    expect(component.timelineEntries.map((entry) => component.timelineEventTag(entry))).toEqual([
+    expect(component.timelineEntries.map((entry) => entry.tag)).toEqual([
       'Session event',
       'Command',
       'Session event',
@@ -258,12 +259,13 @@ describe('SessionAudit', () => {
     component.selectSession(session);
 
     const group = component.commandGroups[0];
+    expect(group.outputHydrated).toBe(false);
+    expect(component.displayOutput(group)).toBe(group.outputText);
     expect(group.rawOutputText).toContain('\x1b[31m');
     expect(group.outputText).toContain('red');
     expect(group.outputText).toContain('new');
     expect(group.outputText).toContain('progress 100%');
     expect(group.outputText).not.toContain('\x1b');
-    expect(component.displayOutput(group)).toBe(group.outputText);
 
     component.setOutputViewMode(group, 'raw');
 
@@ -514,6 +516,7 @@ describe('SessionAudit', () => {
 
     expect(component.commandGroups.length).toBe(1);
     expect(component.commandGroups[0].command.commandText).toBe('Terminal output');
+    component.displayOutput(component.commandGroups[0]);
     expect(component.commandGroups[0].outputText).toBe('login banner');
   });
 
@@ -533,6 +536,7 @@ describe('SessionAudit', () => {
 
     const group = component.commandGroups[0];
     expect(group.command.commandText).toBe('Terminal output');
+    component.displayOutput(group);
     expect(group.outputText).toBe('ls -lrta\necho "test"');
     expect(group.rawOutputText).toBe('ls -lrtaecho "test"');
   });
@@ -552,6 +556,7 @@ describe('SessionAudit', () => {
     component.selectSession(session);
 
     const group = component.commandGroups[0];
+    component.displayOutput(group);
     expect(group.outputText).toBe('echo "hello1234"\nls -lrt');
     expect(group.rawOutputText).toBe('echo "hello1234"ls -lrt');
   });
@@ -597,6 +602,7 @@ describe('SessionAudit', () => {
     component.selectSession(session);
 
     const group = component.commandGroups[0];
+    component.displayOutput(group);
     expect(group.outputText).toBe('/home/ubuntu');
     expect(group.rawOutputText).toContain('pwd\r\n');
     expect(component.displayOutput(group)).toBe('/home/ubuntu');

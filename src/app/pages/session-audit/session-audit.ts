@@ -41,6 +41,8 @@ interface CommandGroup {
   rawOutputText: string;
   outputBytes: number;
   hasTruncatedOutput: boolean;
+  outputHydrated: boolean;
+  outputExpanded: boolean;
 }
 
 type OutputViewMode = 'clean' | 'raw';
@@ -72,6 +74,9 @@ interface TimelineEntry {
   type: TimelineEntryType;
   sequence: number;
   createdAt: string;
+  text: string;
+  tag: string;
+  icon: string;
   group?: CommandGroup;
   record?: SessionAuditRecord;
 }
@@ -495,6 +500,8 @@ export class SessionAudit implements OnInit {
           rawOutputText: '',
           outputBytes: 0,
           hasTruncatedOutput: false,
+          outputHydrated: false,
+          outputExpanded: false,
         });
         continue;
       }
@@ -528,13 +535,11 @@ export class SessionAudit implements OnInit {
         rawOutputText: '',
         outputBytes: 0,
         hasTruncatedOutput: false,
+        outputHydrated: false,
+        outputExpanded: false,
       });
     }
     for (const group of result) {
-      group.rawOutputText = this.rawOutputText(group.outputs);
-      group.outputText = group.id === 'startup-output'
-        ? this.cleanOrphanOutputText(group.outputs, commandTexts)
-        : this.cleanCommandOutputText(group.outputs, group.command.commandText);
       group.outputBytes = this.outputBytes(group.outputs);
       group.hasTruncatedOutput = this.hasTruncated(group.outputs);
     }
@@ -547,6 +552,9 @@ export class SessionAudit implements OnInit {
       type: 'command',
       sequence: group.command.sequence,
       createdAt: group.command.createdAt,
+      text: group.command.commandText || 'Command',
+      tag: group.id === 'startup-output' ? 'Terminal output' : 'Command',
+      icon: 'snippets',
       group,
     }));
     for (const record of records) {
@@ -558,6 +566,11 @@ export class SessionAudit implements OnInit {
         type: record.recordType === 'control' ? 'control' : 'session_event',
         sequence: record.sequence,
         createdAt: record.createdAt,
+        text: record.recordType === 'control'
+          ? record.commandText || 'Control event'
+          : this.sessionLifecycleEventText(record.commandText),
+        tag: record.recordType === 'control' ? 'Control' : 'Session event',
+        icon: record.recordType === 'control' ? 'warning' : 'audit',
         record,
       });
     }
@@ -602,45 +615,28 @@ export class SessionAudit implements OnInit {
 
   setOutputViewMode(group: CommandGroup, mode: OutputViewMode): void {
     this.outputViewModes[group.id] = mode;
+    this.hydrateGroupOutput(group);
   }
 
   displayOutput(group: CommandGroup): string {
+    this.hydrateGroupOutput(group);
     return this.outputViewMode(group) === 'raw' ? group.rawOutputText : group.outputText;
   }
 
-  timelineEventText(entry: TimelineEntry): string {
-    if (entry.group) {
-      return entry.group.command.commandText || 'Command';
-    }
-    if (!entry.record) {
-      return '';
-    }
-    if (entry.record.recordType === 'control') {
-      return entry.record.commandText || 'Control event';
-    }
-    return this.sessionLifecycleEventText(entry.record.commandText);
-  }
-
-  timelineEventTag(entry: TimelineEntry): string {
-    switch (entry.type) {
-      case 'command':
-        return entry.group?.id === 'startup-output' ? 'Terminal output' : 'Command';
-      case 'control':
-        return 'Control';
-      case 'session_event':
-        return 'Session event';
+  onOutputToggle(group: CommandGroup, event: Event): void {
+    const details = event.target as HTMLDetailsElement | null;
+    group.outputExpanded = Boolean(details?.open);
+    if (group.outputExpanded) {
+      this.hydrateGroupOutput(group);
     }
   }
 
-  timelineEventIcon(entry: TimelineEntry): string {
-    switch (entry.type) {
-      case 'command':
-        return 'snippets';
-      case 'control':
-        return 'warning';
-      case 'session_event':
-        return 'audit';
-    }
+  trackSession(_: number, session: AuditSessionSummary): string {
+    return session.sessionId;
+  }
+
+  trackTimelineEntry(_: number, entry: TimelineEntry): string {
+    return entry.key;
   }
 
   recordBodyPreview(record: SessionAuditRecord): string {
@@ -946,6 +942,22 @@ export class SessionAudit implements OnInit {
       byteCount: record.byteCount,
       truncated: record.truncated,
     };
+  }
+
+  private hydrateGroupOutput(group: CommandGroup): void {
+    if (group.outputHydrated) {
+      return;
+    }
+    const commandTexts = group.id === 'startup-output'
+      ? this.records
+        .filter((record) => record.recordType === 'command' && Boolean(record.commandText))
+        .map((record) => record.commandText ?? '')
+      : [];
+    group.rawOutputText = this.rawOutputText(group.outputs);
+    group.outputText = group.id === 'startup-output'
+      ? this.cleanOrphanOutputText(group.outputs, commandTexts)
+      : this.cleanCommandOutputText(group.outputs, group.command.commandText);
+    group.outputHydrated = true;
   }
 
   private cleanCommandOutputText(records: SessionAuditRecord[], commandText?: string): string {

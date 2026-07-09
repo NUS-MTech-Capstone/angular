@@ -40,7 +40,7 @@
             <nz-spin [nzSpinning]="isLoadingSessions">
               <div *ngIf="sessions.length > 0" class="session-card-list">
                 <article
-                  *ngFor="let session of sessions"
+                  *ngFor="let session of sessions; trackBy: trackSession"
                   class="session-card"
                   [class.selected]="selectedSession?.sessionId === session.sessionId"
                   (click)="selectSession(session)">
@@ -150,39 +150,41 @@
 
               <nz-spin [nzSpinning]="isLoadingRecords">
                 <div *ngIf="timelineEntries.length > 0; else noRecords" class="timeline">
-                  <article class="command-entry" *ngFor="let entry of timelineEntries">
+                  <article class="command-entry" *ngFor="let entry of timelineEntries; trackBy: trackTimelineEntry">
                     <div class="command-line">
-                      <span nz-icon [nzType]="timelineEventIcon(entry)" nzTheme="outline"></span>
-                      <code>{{ timelineEventText(entry) }}</code>
+                      <span nz-icon [nzType]="entry.icon" nzTheme="outline"></span>
+                      <code>{{ entry.text }}</code>
                       <span class="timestamp">{{ entry.createdAt | date:'HH:mm:ss' }}</span>
                     </div>
                     <div class="command-meta">
-                      <nz-tag>{{ timelineEventTag(entry) }}</nz-tag>
+                      <nz-tag>{{ entry.tag }}</nz-tag>
                       <span *ngIf="entry.group">{{ entry.group.outputBytes }} bytes output</span>
                       <nz-tag *ngIf="entry.group?.hasTruncatedOutput" nzColor="orange">TRUNCATED</nz-tag>
                     </div>
-                    <details *ngIf="entry.group as group" class="output-block" [open]="group.outputs.length > 0">
+                    <details *ngIf="entry.group as group" class="output-block" (toggle)="onOutputToggle(group, $event)">
                       <summary>Output</summary>
-                      <div class="output-toolbar">
-                        <button
-                          nz-button
-                          nzSize="small"
-                          [nzType]="outputViewMode(group) === 'clean' ? 'primary' : 'default'"
-                          (click)="setOutputViewMode(group, 'clean')">
-                          Clean
-                        </button>
-                        <button
-                          nz-button
-                          nzSize="small"
-                          [nzType]="outputViewMode(group) === 'raw' ? 'primary' : 'default'"
-                          (click)="setOutputViewMode(group, 'raw')">
-                          Raw
-                        </button>
-                      </div>
-                      <pre *ngIf="displayOutput(group); else emptyOutput">{{ displayOutput(group) }}</pre>
-                      <ng-template #emptyOutput>
-                        <div class="empty-output">No readable output retained for this command.</div>
-                      </ng-template>
+                      <ng-container *ngIf="group.outputExpanded">
+                        <div class="output-toolbar">
+                          <button
+                            nz-button
+                            nzSize="small"
+                            [nzType]="outputViewMode(group) === 'clean' ? 'primary' : 'default'"
+                            (click)="setOutputViewMode(group, 'clean')">
+                            Clean
+                          </button>
+                          <button
+                            nz-button
+                            nzSize="small"
+                            [nzType]="outputViewMode(group) === 'raw' ? 'primary' : 'default'"
+                            (click)="setOutputViewMode(group, 'raw')">
+                            Raw
+                          </button>
+                        </div>
+                        <pre *ngIf="displayOutput(group); else emptyOutput">{{ displayOutput(group) }}</pre>
+                        <ng-template #emptyOutput>
+                          <div class="empty-output">No readable output retained for this command.</div>
+                        </ng-template>
+                      </ng-container>
                     </details>
                   </article>
                 </div>
