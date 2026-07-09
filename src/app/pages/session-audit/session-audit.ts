@@ -68,6 +68,8 @@ interface AuditRecordSearchRow {
 }
 
 type TimelineEntryType = 'command' | 'control' | 'session_event';
+type TimelineEntryTag = 'Command' | 'Terminal output' | 'Control' | 'Session event';
+type TimelineFilterType = TimelineEntryTag | '';
 
 interface TimelineEntry {
   key: string;
@@ -75,7 +77,7 @@ interface TimelineEntry {
   sequence: number;
   createdAt: string;
   text: string;
-  tag: string;
+  tag: TimelineEntryTag;
   icon: string;
   group?: CommandGroup;
   record?: SessionAuditRecord;
@@ -119,6 +121,7 @@ function defaultRecordFilters(): RecordFilters {
   styleUrl: './session-audit.css',
 })
 export class SessionAudit implements OnInit {
+  readonly timelineFilterTypes: TimelineFilterType[] = ['', 'Command', 'Terminal output', 'Control', 'Session event'];
   readonly alertStatuses: AlertStatus[] = [
     'RECEIVED',
     'TRIAGING',
@@ -188,6 +191,11 @@ export class SessionAudit implements OnInit {
   records: SessionAuditRecord[] = [];
   commandGroups: CommandGroup[] = [];
   timelineEntries: TimelineEntry[] = [];
+  filteredTimelineEntries: TimelineEntry[] = [];
+  timelineFilters = {
+    query: '',
+    type: '' as TimelineFilterType,
+  };
   sessionEventRecords: SessionAuditRecord[] = [];
   auditRecords: SessionAuditRecord[] = [];
   auditRecordRows: AuditRecordSearchRow[] = [];
@@ -433,8 +441,9 @@ export class SessionAudit implements OnInit {
 
   selectSession(session: AuditSessionSummary): void {
     this.selectedSession = session;
-    this.records = [];
     this.nextRecordCursor = undefined;
+    this.resetTimelineFilters(false);
+    this.setRecords([]);
     this.loadRecords();
   }
 
@@ -479,6 +488,28 @@ export class SessionAudit implements OnInit {
     this.commandGroups = this.buildCommandGroups(records);
     this.sessionEventRecords = records.filter((record) => record.recordType === 'session_event');
     this.timelineEntries = this.buildTimelineEntries(records, this.commandGroups);
+    this.applyTimelineFilters();
+  }
+
+  applyTimelineFilters(): void {
+    const query = this.timelineFilters.query.trim().toLowerCase();
+    const type = this.timelineFilters.type;
+    this.filteredTimelineEntries = this.timelineEntries.filter((entry) => {
+      if (type && entry.tag !== type) {
+        return false;
+      }
+      if (!query) {
+        return true;
+      }
+      return entry.text.toLowerCase().includes(query);
+    });
+  }
+
+  resetTimelineFilters(apply = true): void {
+    this.timelineFilters = { query: '', type: '' };
+    if (apply) {
+      this.applyTimelineFilters();
+    }
   }
 
   private buildCommandGroups(records: SessionAuditRecord[]): CommandGroup[] {

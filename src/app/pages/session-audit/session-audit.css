@@ -227,6 +227,14 @@
   white-space: nowrap;
 }
 
+.timeline-filters {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(150px, 190px) auto;
+  gap: 8px;
+  align-items: center;
+  margin: 12px 0;
+}
+
 .timeline {
   display: flex;
   flex-direction: column;
@@ -388,6 +396,10 @@
   .record-search,
   .agentic-filters {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .timeline-filters {
+    grid-template-columns: 1fr;
   }
 
   .audit-layout,

@@ -148,9 +148,29 @@
                 nzMessage="This session reached the audit storage cap; later output may be missing.">
               </nz-alert>
 
+              <div class="timeline-filters">
+                <input
+                  nz-input
+                  placeholder="Search commands and events"
+                  [(ngModel)]="timelineFilters.query"
+                  (ngModelChange)="applyTimelineFilters()" />
+                <nz-select
+                  nzAllowClear
+                  nzPlaceHolder="Type"
+                  [(ngModel)]="timelineFilters.type"
+                  (ngModelChange)="applyTimelineFilters()">
+                  <nz-option
+                    *ngFor="let type of timelineFilterTypes"
+                    [nzValue]="type"
+                    [nzLabel]="type || 'All types'">
+                  </nz-option>
+                </nz-select>
+                <button nz-button nzType="default" (click)="resetTimelineFilters()">Clear</button>
+              </div>
+
               <nz-spin [nzSpinning]="isLoadingRecords">
-                <div *ngIf="timelineEntries.length > 0; else noRecords" class="timeline">
-                  <article class="command-entry" *ngFor="let entry of timelineEntries; trackBy: trackTimelineEntry">
+                <div *ngIf="filteredTimelineEntries.length > 0; else noRecords" class="timeline">
+                  <article class="command-entry" *ngFor="let entry of filteredTimelineEntries; trackBy: trackTimelineEntry">
                     <div class="command-line">
                       <span nz-icon [nzType]="entry.icon" nzTheme="outline"></span>
                       <code>{{ entry.text }}</code>
@@ -189,7 +209,7 @@
                   </article>
                 </div>
                 <ng-template #noRecords>
-                  <nz-empty nzNotFoundContent="No audit records retained for this session"></nz-empty>
+                  <nz-empty [nzNotFoundContent]="timelineEntries.length > 0 ? 'No timeline entries match the current filters' : 'No audit records retained for this session'"></nz-empty>
                 </ng-template>
               </nz-spin>
 

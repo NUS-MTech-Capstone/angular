@@ -251,6 +251,20 @@ describe('SessionAudit', () => {
       'Session event',
       'Control',
     ]);
+
+    component.timelineFilters.query = 'alice';
+    component.applyTimelineFilters();
+    expect(component.filteredTimelineEntries.map((entry) => entry.text)).toEqual([
+      'Alice Admin has left the session as owner',
+      'Alice Admin rejoined',
+    ]);
+
+    component.timelineFilters = { query: '', type: 'Control' };
+    component.applyTimelineFilters();
+    expect(component.filteredTimelineEntries.map((entry) => entry.text)).toEqual(['Ctrl-C']);
+
+    component.resetTimelineFilters();
+    expect(component.filteredTimelineEntries).toEqual(component.timelineEntries);
   });
 
   it('cleans terminal escape sequences and keeps raw output available', () => {
