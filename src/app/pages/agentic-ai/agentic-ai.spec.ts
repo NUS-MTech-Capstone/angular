@@ -157,7 +157,7 @@ describe('AgenticAi', () => {
       }),
     };
 
-    await TestBed.configureTestingModule({
+    TestBed.configureTestingModule({
       imports: [AgenticAi],
       providers: [
         provideNzIcons(icons),
@@ -167,11 +167,9 @@ describe('AgenticAi', () => {
         { provide: NzMessageService, useValue: message },
         { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: { get: vi.fn(() => null) } } } },
       ],
-    })
-      .overrideComponent(AgenticAi, {
-        add: { providers: [{ provide: NzModalService, useValue: modal }] },
-      })
-      .compileComponents();
+    });
+    TestBed.overrideProvider(NzModalService, { useValue: modal });
+    await TestBed.compileComponents();
 
     fixture = TestBed.createComponent(AgenticAi);
     component = fixture.componentInstance;
