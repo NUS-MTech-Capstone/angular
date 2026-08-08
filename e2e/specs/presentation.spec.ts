@@ -41,9 +41,6 @@ describe('DenDenMushi presentation walkthrough', () => {
 
     await loginPage.signInAsDevUser(config.defaultDevUserName);
     await accessPage.waitForLoad();
-    await presentationScene('Access — Servers');
-
-    await accessPage.selectSection('Change Requests');
     await presentationScene('Access — Change Requests');
 
     await accessPage.selectSection('Sessions');

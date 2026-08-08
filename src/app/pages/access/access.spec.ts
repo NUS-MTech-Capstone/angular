@@ -3,7 +3,6 @@ import { provideNzIcons } from 'ng-zorro-antd/icon';
 import { of } from 'rxjs';
 import { icons } from '../../icons-provider';
 import { ChangeRequestService } from '../../services/change-request.service';
-import { ImplementerGroupService } from '../../services/implementer-group.service';
 import { SessionsApiService } from '../../services/sessions.service';
 import { AuthService } from '../../services/auth.service';
 import { Access } from './access';
@@ -12,7 +11,6 @@ describe('Access', () => {
   let component: Access;
   let fixture: ComponentFixture<Access>;
   let changeRequestService: { findAccessible: ReturnType<typeof vi.fn> };
-  let implementerGroupService: { findAccessibleVms: ReturnType<typeof vi.fn> };
   let sessionsApi: {
     list: ReturnType<typeof vi.fn>;
     close: ReturnType<typeof vi.fn>;
@@ -25,11 +23,6 @@ describe('Access', () => {
   beforeEach(async () => {
     changeRequestService = {
       findAccessible: vi.fn(() => of([])),
-    };
-    implementerGroupService = {
-      findAccessibleVms: vi.fn(() =>
-        of({ implementerGroups: [], osUsers: [], vms: [] }),
-      ),
     };
     sessionsApi = {
       list: vi.fn(() => of({ sessions: [] })),
@@ -45,7 +38,6 @@ describe('Access', () => {
       providers: [
         provideNzIcons(icons),
         { provide: ChangeRequestService, useValue: changeRequestService },
-        { provide: ImplementerGroupService, useValue: implementerGroupService },
         { provide: SessionsApiService, useValue: sessionsApi },
         { provide: AuthService, useValue: authService },
       ],
@@ -60,9 +52,13 @@ describe('Access', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should load accessible servers and change requests on init', () => {
-    expect(implementerGroupService.findAccessibleVms).toHaveBeenCalled();
+  it('loads accessible change requests on init', () => {
     expect(changeRequestService.findAccessible).toHaveBeenCalled();
+  });
+
+  it('shows only the Change Requests and Sessions sections', () => {
+    expect(component.sections).toEqual(['Change Requests', 'Sessions']);
+    expect(component.activeSection).toBe('Change Requests');
   });
 
   it('loads active sessions when Sessions section is selected', () => {

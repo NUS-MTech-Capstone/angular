@@ -40,36 +40,6 @@
       </nz-autocomplete>
     </ng-container>
 
-    <ng-container *ngIf="activeSection === 'Servers'">
-      <nz-input-group [nzPrefix]="serverSearchIcon" class="search-bar" nzSize="large">
-        <input
-          nz-input
-          placeholder="Search servers by hostname, IP or implementer group"
-          [(ngModel)]="serverSearchTerm" />
-      </nz-input-group>
-      <ng-template #serverSearchIcon><span nz-icon nzType="search"></span></ng-template>
-    </ng-container>
-
-    <ng-container *ngIf="activeSection === 'Servers'">
-      <div class="servers-header" *ngIf="userImplementerGroups.length">
-        <span class="meta-label">Your implementer groups</span>
-        <div class="tag-list">
-          <nz-tag *ngFor="let group of userImplementerGroups" nzColor="blue">{{ group.name }}</nz-tag>
-        </div>
-      </div>
-
-      <nz-empty
-        *ngIf="!isLoadingServers && groupServers.length === 0"
-        nzNotFoundContent="No servers are assigned to your implementer groups yet."
-        class="cr-empty"></nz-empty>
-
-      <ng-container *ngIf="groupServers.length">
-        <ng-container
-          *ngTemplateOutlet="serversTable; context: { servers: activeServers, loading: isLoadingServers, showGroups: true }">
-        </ng-container>
-      </ng-container>
-    </ng-container>
-
     <ng-container *ngIf="activeSection === 'Change Requests'">
       <nz-empty
         *ngIf="!isLoading && accessibleRequests.length === 0"
@@ -219,9 +189,6 @@
       </nz-spin>
     </ng-container>
 
-    <ng-container *ngIf="activeSection === 'Proxies'">
-      <div class="section-placeholder">Proxies — coming soon.</div>
-    </ng-container>
   </section>
 </div>
 

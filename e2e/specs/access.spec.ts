@@ -25,18 +25,18 @@ describe('Access page', () => {
     await quitDriver(driver);
   });
 
-  it('defaults to the Servers section', async () => {
-    assert.equal(await accessPage.getActiveSection(), 'Servers');
+  it('defaults to the Change Requests section', async () => {
+    assert.equal(await accessPage.getActiveSection(), 'Change Requests');
     assert.match(
       await accessPage.getSearchPlaceholder(),
-      /Search servers/i,
+      /Search change request/i,
     );
   });
 
-  it('switches to the Servers section', async () => {
-    await accessPage.selectSection('Servers');
-    assert.equal(await accessPage.getActiveSection(), 'Servers');
-    assert.match(await accessPage.getSearchPlaceholder(), /Search servers/i);
+  it('does not show the Servers or Proxies sections', async () => {
+    const menuText = await driver.findElement({ css: '.access-menu' }).getText();
+    assert.doesNotMatch(menuText, /Servers/);
+    assert.doesNotMatch(menuText, /Proxies/);
   });
 
   it('switches to the Sessions section', async () => {

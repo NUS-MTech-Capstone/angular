@@ -63,6 +63,6 @@ describe('SSH terminal session', () => {
 
     await driver.get(`${config.baseUrl}/access`);
     await accessPage.waitForLoad();
-    assert.equal(await accessPage.getActiveSection(), 'Servers');
+    assert.equal(await accessPage.getActiveSection(), 'Change Requests');
   });
 });

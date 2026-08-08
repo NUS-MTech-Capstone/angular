@@ -88,14 +88,6 @@
   color: rgba(0, 0, 0, 0.65);
 }
 
-.servers-header {
-  margin: 16px 0;
-}
-
-.servers-header .tag-list {
-  margin-top: 8px;
-}
-
 .cr-empty {
   margin-top: 48px;
 }
@@ -204,13 +196,6 @@
   background: #6f42c1;
   border-color: #6f42c1;
   color: #fff;
-}
-
-.section-placeholder {
-  padding: 48px 0;
-  text-align: center;
-  color: rgba(0, 0, 0, 0.45);
-  font-size: 14px;
 }
 
 .sessions-tab-header {

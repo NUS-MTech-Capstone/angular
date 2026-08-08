@@ -17,10 +17,7 @@ import {
   AccessibleChangeRequest,
   ChangeRequestService,
 } from '../../services/change-request.service';
-import {
-  ImplementerGroup,
-  ImplementerGroupService,
-} from '../../services/implementer-group.service';
+import { ImplementerGroup } from '../../services/implementer-group.service';
 import { GatewaySession, SessionsApiService } from '../../services/sessions.service';
 import type { VirtualMachine } from '../../services/inventory.service';
 
@@ -77,24 +74,19 @@ interface AccessServer {
 export class Access implements OnInit {
   private auth = inject(AuthService);
   private changeRequestService = inject(ChangeRequestService);
-  private implementerGroupService = inject(ImplementerGroupService);
   private sessionsApi = inject(SessionsApiService);
   private cd = inject(ChangeDetectorRef);
 
-  sections = ['Servers', 'Change Requests', 'Sessions', 'Proxies'];
-  activeSection = 'Servers';
+  sections = ['Change Requests', 'Sessions'];
+  activeSection = 'Change Requests';
   isPanelCollapsed = false;
   crSearchTerm = '';
-  serverSearchTerm = '';
 
   accessibleRequests: AccessibleChangeRequest[] = [];
   selectedRequestId?: string;
   selectedRequest?: AccessibleChangeRequest;
-  groupServers: AccessServer[] = [];
   crServers: AccessServer[] = [];
-  userImplementerGroups: ImplementerGroup[] = [];
   isLoading = false;
-  isLoadingServers = false;
 
   /** Active sessions from Proxy Control Plane (for Sessions tab). */
   allActiveSessions: GatewaySession[] = [];
@@ -110,13 +102,10 @@ export class Access implements OnInit {
   }
 
   get activeServers(): AccessServer[] {
-    return this.activeSection === 'Servers'
-      ? this.filteredGroupServers
-      : this.crServers;
+    return this.crServers;
   }
 
   ngOnInit(): void {
-    this.loadAccessibleAssets();
     this.loadAccessibleRequests();
   }
 
@@ -154,14 +143,6 @@ export class Access implements OnInit {
   }
 
   private syncServerSessions(backendSessions: GatewaySession[]): void {
-    // Update groupServers sessions lists
-    for (const server of this.groupServers) {
-      const active: ActiveSession[] = this.sessionsForServer(backendSessions, server).map((s) =>
-        this.gatewayToActiveSession(s, server),
-      );
-      server.sessions = active;
-      this.sessionsByVmId.set(server.vmId, active);
-    }
     for (const server of this.crServers) {
       const active: ActiveSession[] = this.sessionsForServer(
         backendSessions,
@@ -252,26 +233,7 @@ export class Access implements OnInit {
   }
 
   private findServerByGatewayHostId(hostId: string): AccessServer | undefined {
-    return [...this.groupServers, ...this.crServers].find((server) => server.hostname === hostId);
-  }
-
-  private loadAccessibleAssets(): void {
-    this.isLoadingServers = true;
-    this.implementerGroupService.findAccessibleVms().subscribe({
-      next: ({ implementerGroups, vms }) => {
-        this.userImplementerGroups = implementerGroups;
-        this.groupServers = vms.map((vm) =>
-          this.mapVmToAccessServer(vm, implementerGroups),
-        );
-        this.isLoadingServers = false;
-        this.cd.detectChanges();
-      },
-      error: (err) => {
-        console.error('Error loading accessible servers:', err);
-        this.isLoadingServers = false;
-        this.cd.detectChanges();
-      },
-    });
+    return this.crServers.find((server) => server.hostname === hostId);
   }
 
   private loadAccessibleRequests(): void {
@@ -280,6 +242,9 @@ export class Access implements OnInit {
       next: (requests) => {
         this.accessibleRequests = requests;
         this.isLoading = false;
+        if (!this.selectedRequest && requests.length) {
+          this.onCrSelected(requests[0].id);
+        }
         this.cd.detectChanges();
       },
       error: (err) => {
@@ -359,22 +324,6 @@ export class Access implements OnInit {
         request.id.toLowerCase().includes(term) ||
         request.title.toLowerCase().includes(term) ||
         request.requester.toLowerCase().includes(term),
-    );
-  }
-
-  get filteredGroupServers(): AccessServer[] {
-    const term = this.serverSearchTerm.trim().toLowerCase();
-    if (!term) {
-      return this.groupServers;
-    }
-    return this.groupServers.filter(
-      (server) =>
-        server.hostname.toLowerCase().includes(term) ||
-        server.ipAddress.toLowerCase().includes(term) ||
-        server.osVersion.toLowerCase().includes(term) ||
-        server.implementerGroups.some((group) =>
-          group.toLowerCase().includes(term),
-        ),
     );
   }
 
