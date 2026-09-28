@@ -79,5 +79,12 @@ GET /readyz
 ```
 
 Both probe endpoints are served directly by Nginx. Hashed static assets receive
-immutable caching headers, application routes fall back to `index.html`, and
-security headers are applied at the web server.
+immutable caching headers, while SPA HTML and probe responses use
+`Cache-Control: no-store`. Application routes fall back to `index.html`.
+
+Nginx applies the enforced application CSP, clickjacking and MIME-sniffing
+protection, a restricted permissions policy, the referrer policy, and
+`Strict-Transport-Security: max-age=31536000`. The CSP intentionally retains
+the sources required by the current Angular and WebSocket UI; COEP and COOP are
+not enabled because the application does not require cross-origin isolation.
+Nginx version tokens are disabled.
