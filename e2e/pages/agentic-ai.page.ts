@@ -38,5 +38,23 @@ export class AgenticAiPage {
         By.xpath(".//button[contains(@class,'ant-btn-primary')][normalize-space()='Approve']"),
       )
       .click();
+
+    await this.driver.wait(async () => {
+      const notices = await this.driver.findElements(By.css('.ant-message-notice-content'));
+      for (const notice of notices) {
+        if (!(await notice.isDisplayed())) {
+          continue;
+        }
+        const text = (await notice.getText()).trim();
+        if (text.includes('Remediation approved')) {
+          return true;
+        }
+        const errorContent = await notice.findElements(By.css('.ant-message-error'));
+        if (errorContent.length > 0) {
+          throw new Error(`Exact-plan approval was rejected by the application: ${text}`);
+        }
+      }
+      return false;
+    }, config.pageLoadTimeoutMs);
   }
 }
