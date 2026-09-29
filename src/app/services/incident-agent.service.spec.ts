@@ -57,7 +57,10 @@ const incidentDetail = (): IncidentDetail => ({
       {
         name: 'Evidence Collector Agent',
         purpose: 'Collect bounded diagnostic evidence from approved operation IDs.',
-        responsibilities: ['Start a bounded automation run.', 'Execute diagnostic operation IDs from the v1 catalog.'],
+        responsibilities: [
+          'Start a bounded automation run.',
+          'Execute diagnostic operation IDs from the v1 catalog.',
+        ],
         reasoningType: 'deterministic policy',
         memory: 'incident-local operation results',
         tools: ['Agent Control Plane automation API', 'STS capability tokens'],
@@ -67,7 +70,12 @@ const incidentDetail = (): IncidentDetail => ({
       },
     ],
     toolDecisions: [
-      { operationId: 'target_probe', phase: 'diagnose', chosenBy: 'policy', reason: 'default diagnostic' },
+      {
+        operationId: 'target_probe',
+        phase: 'diagnose',
+        chosenBy: 'policy',
+        reason: 'default diagnostic',
+      },
     ],
     guardrails: [{ name: 'catalog_validation', passed: true, reason: 'operation is supported' }],
     responsibility: {
@@ -124,11 +132,7 @@ describe('IncidentAgentService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [
-        IncidentAgentService,
-        provideHttpClient(),
-        provideHttpClientTesting(),
-      ],
+      providers: [IncidentAgentService, provideHttpClient(), provideHttpClientTesting()],
     });
     service = TestBed.inject(IncidentAgentService);
     http = TestBed.inject(HttpTestingController);
@@ -139,9 +143,18 @@ describe('IncidentAgentService', () => {
   it('lists alerts with filters and a JSON accept header', () => {
     let result: AlertListResponse | undefined;
 
-    service.listAlerts({ incidentId: 'inc-1', hostId: 'host-dev-1', status: 'PENDING_APPROVAL', limit: 25 }).subscribe((response) => (result = response));
+    service
+      .listAlerts({
+        incidentId: 'inc-1',
+        hostId: 'host-dev-1',
+        status: 'PENDING_APPROVAL',
+        limit: 25,
+      })
+      .subscribe((response) => (result = response));
 
-    const req = http.expectOne('/alerts?incidentId=inc-1&hostId=host-dev-1&status=PENDING_APPROVAL&limit=25');
+    const req = http.expectOne(
+      '/alerts?incidentId=inc-1&hostId=host-dev-1&status=PENDING_APPROVAL&limit=25',
+    );
     expect(req.request.method).toBe('GET');
     expect(req.request.headers.get('Accept')).toBe('application/json');
     req.flush({ alerts: [alertDetail()] });
@@ -186,9 +199,13 @@ describe('IncidentAgentService', () => {
   it('lists incidents with filters and a JSON accept header', () => {
     let result: IncidentListResponse | undefined;
 
-    service.list({ alertId: 'alert-1', hostId: 'host-dev-1', state: 'AWAITING_APPROVAL', limit: 25 }).subscribe((response) => (result = response));
+    service
+      .list({ alertId: 'alert-1', hostId: 'host-dev-1', state: 'AWAITING_APPROVAL', limit: 25 })
+      .subscribe((response) => (result = response));
 
-    const req = http.expectOne('/incidents?alertId=alert-1&hostId=host-dev-1&state=AWAITING_APPROVAL&limit=25');
+    const req = http.expectOne(
+      '/incidents?alertId=alert-1&hostId=host-dev-1&state=AWAITING_APPROVAL&limit=25',
+    );
     expect(req.request.method).toBe('GET');
     expect(req.request.headers.get('Accept')).toBe('application/json');
     req.flush({ incidents: [incidentDetail()] });
@@ -197,9 +214,13 @@ describe('IncidentAgentService', () => {
   });
 
   it('lists incident events with filters', () => {
-    service.listEvents({ incidentId: 'inc-1', alertId: 'alert-1', eventType: 'PlanApproved', limit: 25 }).subscribe();
+    service
+      .listEvents({ incidentId: 'inc-1', alertId: 'alert-1', eventType: 'PlanApproved', limit: 25 })
+      .subscribe();
 
-    const req = http.expectOne('/incidents/events?incidentId=inc-1&alertId=alert-1&eventType=PlanApproved&limit=25');
+    const req = http.expectOne(
+      '/incidents/events?incidentId=inc-1&alertId=alert-1&eventType=PlanApproved&limit=25',
+    );
     expect(req.request.method).toBe('GET');
     expect(req.request.headers.get('Accept')).toBe('application/json');
     req.flush({ events: [] });
@@ -218,6 +239,35 @@ describe('IncidentAgentService', () => {
     expect(result?.plan.actions[0].operationId).toBe('restart_service');
     expect(result?.explanation.agents[0].name).toBe('Evidence Collector Agent');
     expect(result?.explanation.toolDecisions[0].operationId).toBe('target_probe');
+  });
+
+  it('normalizes nullable incident detail lists from the live API', () => {
+    let result: IncidentDetail | undefined;
+
+    service.get('inc-1').subscribe((response) => (result = response));
+
+    const req = http.expectOne('/incidents/inc-1');
+    req.flush({
+      ...incidentDetail(),
+      evidence: null,
+      timeline: null,
+      approvalDecisions: null,
+      plan: { ...incidentDetail().plan, actions: null },
+      explanation: {
+        ...incidentDetail().explanation,
+        agents: null,
+        toolDecisions: null,
+        guardrails: null,
+      },
+    });
+
+    expect(result?.evidence).toEqual([]);
+    expect(result?.plan.actions).toEqual([]);
+    expect(result?.explanation.agents).toEqual([]);
+    expect(result?.explanation.toolDecisions).toEqual([]);
+    expect(result?.explanation.guardrails).toEqual([]);
+    expect(result?.timeline).toEqual([]);
+    expect(result?.approvalDecisions).toEqual([]);
   });
 
   it('approves an exact plan hash', () => {

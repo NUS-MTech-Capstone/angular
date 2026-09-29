@@ -1,4 +1,4 @@
-import { By, WebDriver } from 'selenium-webdriver';
+import { By, WebDriver, until } from 'selenium-webdriver';
 import { config } from '../config';
 import { presentationPause, waitForVisibleText } from '../support/driver';
 
@@ -13,36 +13,27 @@ export class AccessPage {
     const item = await this.driver.findElement(
       By.xpath(`//ul[contains(@class,'access-menu')]//li[normalize-space()='${section}']`),
     );
-    await this.driver.executeScript(
-      'arguments[0].scrollIntoView({block: "center"});',
-      item,
-    );
+    await this.driver.executeScript('arguments[0].scrollIntoView({block: "center"});', item);
     await item.click();
     await this.driver.wait(async () => {
-      const selected = await this.driver.findElement(
-        By.css('.access-menu li.selected'),
-      );
+      const selected = await this.driver.findElement(By.css('.access-menu li.selected'));
       return (await selected.getText()) === section;
     }, config.pageLoadTimeoutMs);
     await presentationPause(`Selected ${section}`);
   }
   async getActiveSection(): Promise<string> {
-    const selected = await this.driver.findElement(
-      By.css('.access-menu li.selected'),
-    );
+    const selected = await this.driver.findElement(By.css('.access-menu li.selected'));
     return selected.getText();
   }
 
   async getSearchPlaceholder(): Promise<string> {
     const input = await this.driver.findElement({ css: '.search-bar input' });
-    return input.getAttribute('placeholder');
+    return (await input.getAttribute('placeholder')) ?? '';
   }
 
   async waitForServerTable(): Promise<void> {
     await this.driver.wait(async () => {
-      const rows = await this.driver.findElements(
-        By.css('.servers-table tbody tr.ant-table-row'),
-      );
+      const rows = await this.driver.findElements(By.css('.servers-table tbody tr.ant-table-row'));
       return rows.length > 0;
     }, config.pageLoadTimeoutMs);
   }
@@ -62,18 +53,32 @@ export class AccessPage {
   async prepareTerminalLaunchCapture(): Promise<void> {
     await this.driver.executeScript(`
       window.__ddmTerminalOpenUrl = null;
-      const nativeOpen = window.open.bind(window);
-      window.open = (url, target, features) => {
+      window.open = (url) => {
         window.__ddmTerminalOpenUrl = url;
-        return nativeOpen(url, target, features);
+        return null;
       };
     `);
   }
 
-  async getCapturedTerminalPath(): Promise<string | null> {
-    return this.driver.executeScript<string | null>(
-      'return window.__ddmTerminalOpenUrl;',
+  async selectChangeRequestByTitle(title: string): Promise<void> {
+    const input = await this.driver.findElement(By.css('.search-bar input'));
+    await input.clear();
+    await input.sendKeys(title);
+    const option = await this.driver.wait(
+      until.elementLocated(
+        By.xpath(
+          `//div[contains(@class,'ant-select-item-option')][.//*[contains(@class,'cr-option-title') and normalize-space()='${title}']]`,
+        ),
+      ),
+      config.pageLoadTimeoutMs,
     );
+    await this.driver.wait(until.elementIsVisible(option), config.pageLoadTimeoutMs);
+    await option.click();
+    await waitForVisibleText(this.driver, '.cr-meta', title);
+  }
+
+  async getCapturedTerminalPath(): Promise<string | null> {
+    return this.driver.executeScript<string | null>('return window.__ddmTerminalOpenUrl;');
   }
 
   async expandServerRow(hostname: string): Promise<void> {

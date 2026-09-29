@@ -4,7 +4,7 @@ import { config } from '../config';
 
 export const mochaHooks = {
   beforeAll: async function (this: Mocha.Context) {
-    this.timeout(config.presentation ? 300000 : 15000);
+    this.timeout(config.presentation ? 300000 : config.live ? 60000 : 15000);
     await ensureServicesAvailable();
   },
 

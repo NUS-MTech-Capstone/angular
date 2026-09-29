@@ -1,6 +1,6 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { map, Observable } from 'rxjs';
 
 export type IncidentState =
   | 'DIAGNOSING'
@@ -295,7 +295,14 @@ export class IncidentAgentService {
   }
 
   getAlert(id: string): Observable<ManagedAlertDetail> {
-    return this.http.get<ManagedAlertDetail>(`${this.alertsBase}/${id}`, { headers: JSON_HEADERS });
+    return this.http
+      .get<ManagedAlertDetail>(`${this.alertsBase}/${id}`, { headers: JSON_HEADERS })
+      .pipe(
+        map((detail) => ({
+          ...detail,
+          incident: detail.incident ? this.normalizeIncidentDetail(detail.incident) : null,
+        })),
+      );
   }
 
   getHealth(): Observable<AgentHealth> {
@@ -310,7 +317,9 @@ export class IncidentAgentService {
   }
 
   get(id: string): Observable<IncidentDetail> {
-    return this.http.get<IncidentDetail>(`${this.incidentsBase}/${id}`, { headers: JSON_HEADERS });
+    return this.http
+      .get<IncidentDetail>(`${this.incidentsBase}/${id}`, { headers: JSON_HEADERS })
+      .pipe(map((detail) => this.normalizeIncidentDetail(detail)));
   }
 
   listEvents(filters: IncidentEventQueryFilters = {}): Observable<IncidentEventListResponse> {
@@ -321,19 +330,42 @@ export class IncidentAgentService {
   }
 
   approve(id: string, planHash: string): Observable<IncidentDetail> {
-    return this.http.post<IncidentDetail>(
-      `${this.incidentsBase}/${id}/approve`,
-      { planHash },
-      { headers: JSON_HEADERS },
-    );
+    return this.http
+      .post<IncidentDetail>(
+        `${this.incidentsBase}/${id}/approve`,
+        { planHash },
+        { headers: JSON_HEADERS },
+      )
+      .pipe(map((detail) => this.normalizeIncidentDetail(detail)));
   }
 
   reject(id: string, planHash: string): Observable<IncidentDetail> {
-    return this.http.post<IncidentDetail>(
-      `${this.incidentsBase}/${id}/reject`,
-      { planHash },
-      { headers: JSON_HEADERS },
-    );
+    return this.http
+      .post<IncidentDetail>(
+        `${this.incidentsBase}/${id}/reject`,
+        { planHash },
+        { headers: JSON_HEADERS },
+      )
+      .pipe(map((detail) => this.normalizeIncidentDetail(detail)));
+  }
+
+  private normalizeIncidentDetail(detail: IncidentDetail): IncidentDetail {
+    return {
+      ...detail,
+      evidence: detail.evidence ?? [],
+      plan: {
+        ...detail.plan,
+        actions: detail.plan?.actions ?? [],
+      },
+      explanation: {
+        ...detail.explanation,
+        agents: detail.explanation?.agents ?? [],
+        toolDecisions: detail.explanation?.toolDecisions ?? [],
+        guardrails: detail.explanation?.guardrails ?? [],
+      },
+      timeline: detail.timeline ?? [],
+      approvalDecisions: detail.approvalDecisions ?? [],
+    };
   }
 
   private toParams(filters: object): Record<string, string> {

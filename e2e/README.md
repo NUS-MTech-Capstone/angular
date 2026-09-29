@@ -4,8 +4,10 @@ Browser automation for the DenDenMushi Angular app using
 [selenium-webdriver](https://www.npmjs.com/package/selenium-webdriver) and
 Google Chrome.
 
-These tests run against the **development auth flow** (`AUTH_MODE=dev` on
-nest-backend). Production ALB/Cognito login is not exercised here.
+The default suites run against the **development auth flow** (`AUTH_MODE=dev`
+on nest-backend). A separate opt-in suite exercises the deployed
+ALB/Cognito, Change Request, SSH, CloudWatch, and approval-gated incident
+recovery path.
 
 ## Prerequisites
 
@@ -38,6 +40,22 @@ Headless mode (CI-friendly):
 npm run test:e2e:headless
 ```
 
+Run the live production workflow only from the verified capstone account:
+
+```bash
+AWS_PROFILE=capstone EXPECTED_AWS_ACCOUNT_ID=891377133321 \
+npm run test:e2e:live
+```
+
+The runner reads `kei-admin@ddm.keiyam.me` from the macOS Keychain service
+`DenDenMushi E2E Cognito`; it never writes the password to files or output.
+It creates and retains a timestamped Change Request and incident evidence,
+captures only post-authentication screenshots under the ignored
+`e2e/artifacts/` directory, and closes the SSH session. If the test stops after
+the selected demo application is made unhealthy, the runner invokes the
+bounded `ddm-ops recover_demo_app` helper through SSM and waits for the alarm
+to recover. This is an application-health test, not a CPU-spike test.
+
 ## Configuration
 
 | Variable | Default | Description |
@@ -49,6 +67,13 @@ npm run test:e2e:headless
 | `E2E_DEV_USER_NAME` | `Kei Yam` | Dev login button label |
 | `E2E_IMPLICIT_WAIT_MS` | `5000` | Selenium implicit wait |
 | `E2E_PAGE_LOAD_TIMEOUT_MS` | `30000` | Page load timeout |
+| `E2E_LIVE` | `false` | Enables deployed ALB/Cognito service checks |
+| `E2E_COGNITO_USERNAME` | `kei-admin@ddm.keiyam.me` | Dedicated live-test login |
+| `E2E_ARTIFACT_DIR` | timestamped `e2e/artifacts` directory | Post-authentication evidence output |
+| `E2E_ALARM_TIMEOUT_MS` | `300000` | CloudWatch transition limit |
+| `E2E_INCIDENT_TIMEOUT_MS` | `480000` | Awaiting-approval limit |
+| `E2E_REMEDIATION_TIMEOUT_MS` | `300000` | Completion limit |
+| `E2E_RECOVERY_TIMEOUT_MS` | `300000` | Target and alarm recovery limit |
 
 ## Layout
 
@@ -69,3 +94,4 @@ e2e/
 | `access.spec.ts` | Access sidebar sections |
 | `profile.spec.ts` | Profile page and logout |
 | `auth-guard.spec.ts` | Route protection and role limits |
+| `live-core-workflow.live.ts` | Opt-in Cognito, CR, SSH, alarm, HITL remediation, and recovery workflow |

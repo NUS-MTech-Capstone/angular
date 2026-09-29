@@ -8,6 +8,23 @@ interface AuthConfigResponse {
 export async function ensureServicesAvailable(): Promise<void> {
   let backendError: string | undefined;
 
+  if (config.live) {
+    if (!config.cognitoUsername || !config.cognitoPassword) {
+      throw new Error('Live E2E Cognito credentials were not loaded.');
+    }
+    if (!config.demoAlarmName) {
+      throw new Error('Live E2E demo alarm name was not configured.');
+    }
+
+    for (const url of [config.baseUrl, `${config.baseUrl}/healthz`]) {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Live service returned HTTP ${response.status} from ${url}`);
+      }
+    }
+    return;
+  }
+
   try {
     const response = await fetch(`${config.apiUrl}/auth/config`);
     if (!response.ok) {
@@ -24,9 +41,7 @@ export async function ensureServicesAvailable(): Promise<void> {
   }
 
   if (backendError) {
-    throw new Error(
-      `${backendError}\nStart the API with: cd nest-backend && npm run start:dev`,
-    );
+    throw new Error(`${backendError}\nStart the API with: cd nest-backend && npm run start:dev`);
   }
 
   try {
