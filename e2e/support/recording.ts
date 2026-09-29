@@ -1,4 +1,4 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { WebDriver } from 'selenium-webdriver';
@@ -6,7 +6,7 @@ import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import { config } from '../config';
 import { activateBrowserWindow } from './foreground';
 
-let suiteRecorder: ChildProcessWithoutNullStreams | null = null;
+let suiteRecorder: ChildProcess | null = null;
 let suiteRecordingPath = '';
 
 interface WindowRect {
@@ -32,15 +32,7 @@ function encodeArgs(outputPath: string): string[] {
   const framerate = config.presentation ? '24' : '15';
   const preset = config.presentation ? 'medium' : 'ultrafast';
 
-  return [
-    '-c:v',
-    'libx264',
-    '-preset',
-    preset,
-    '-pix_fmt',
-    'yuv420p',
-    outputPath,
-  ];
+  return ['-c:v', 'libx264', '-preset', preset, '-pix_fmt', 'yuv420p', outputPath];
 }
 
 function fullScreenCaptureArgs(outputPath: string): string[] {
@@ -61,16 +53,7 @@ function fullScreenCaptureArgs(outputPath: string): string[] {
     ];
   }
 
-  return [
-    '-y',
-    '-f',
-    'x11grab',
-    '-framerate',
-    framerate,
-    '-i',
-    ':0.0',
-    ...encodeArgs(outputPath),
-  ];
+  return ['-y', '-f', 'x11grab', '-framerate', framerate, '-i', ':0.0', ...encodeArgs(outputPath)];
 }
 
 function windowCaptureArgs(rect: WindowRect, outputPath: string): string[] {
@@ -119,9 +102,7 @@ async function waitForBrowserWindowReady(driver: WebDriver): Promise<void> {
   await driver.manage().window().maximize();
 
   await driver.wait(async () => {
-    const readyState = await driver.executeScript<string>(
-      'return document.readyState',
-    );
+    const readyState = await driver.executeScript<string>('return document.readyState');
     return readyState === 'complete' || readyState === 'interactive';
   }, config.pageLoadTimeoutMs);
 
@@ -162,9 +143,7 @@ export async function startBrowserRecording(driver: WebDriver): Promise<string> 
     console.log(`Recording full screen to ${suiteRecordingPath}`);
   } else {
     const rect = await driver.manage().window().getRect();
-    console.log(
-      `Recording browser window (${rect.width}x${rect.height}) to ${suiteRecordingPath}`,
-    );
+    console.log(`Recording browser window (${rect.width}x${rect.height}) to ${suiteRecordingPath}`);
   }
 
   if (config.recordLeadInMs > 0) {
@@ -179,7 +158,7 @@ export async function stopSuiteRecording(): Promise<string | null> {
     return null;
   }
 
-  suiteRecorder.stdin.write('q');
+  suiteRecorder.stdin?.write('q');
   await new Promise<void>((resolve) => {
     suiteRecorder!.on('close', () => resolve());
     setTimeout(() => {

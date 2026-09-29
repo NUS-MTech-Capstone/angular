@@ -3,6 +3,7 @@
 /dist
 /coverage
 /e2e/recordings
+/e2e/artifacts
 
 *.log
 .DS_Store
