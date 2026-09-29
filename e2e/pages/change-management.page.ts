@@ -82,9 +82,25 @@ export class ChangeManagementPage {
       By.css(`nz-date-picker[formcontrolname="${controlName}"] input`),
     );
     await input.click();
+    await this.driver.executeScript(
+      `
+        arguments[0].addEventListener('keydown', (event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+        }, { once: true });
+      `,
+      input,
+    );
     await input.sendKeys(Key.chord(Key.META, 'a'), Key.BACK_SPACE, value, Key.ENTER);
-    await this.driver.wait(async () => (await input.getAttribute('value')) === value, 10000);
-    await this.activeModal();
+    await this.driver.wait(async () => {
+      const currentModal = await this.activeModal();
+      const currentInput = await currentModal.findElement(
+        By.css(`nz-date-picker[formcontrolname="${controlName}"] input`),
+      );
+      return (await currentInput.getAttribute('value')) === value;
+    }, 10000);
   }
 
   private async selectMultiple(controlName: string, label: string): Promise<void> {
