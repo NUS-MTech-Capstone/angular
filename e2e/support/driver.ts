@@ -5,10 +5,7 @@ import { config } from '../config';
 import { activateBrowserWindow } from './foreground';
 import { isRecordingActive, startBrowserRecording } from './recording';
 
-export async function presentationPause(
-  scene?: string,
-  ms = config.stepDelayMs,
-): Promise<void> {
+export async function presentationPause(scene?: string, ms = config.stepDelayMs): Promise<void> {
   if (!config.presentation || config.skipActionPauses || ms <= 0) {
     return;
   }
@@ -31,9 +28,7 @@ export async function presentationScene(scene: string): Promise<void> {
 
 let recordingStarted = false;
 
-export async function beginRecordingWhenBrowserReady(
-  driver: WebDriver,
-): Promise<void> {
+export async function beginRecordingWhenBrowserReady(driver: WebDriver): Promise<void> {
   if (!config.record || config.headless || recordingStarted || isRecordingActive()) {
     return;
   }
@@ -50,25 +45,20 @@ export async function createDriver(): Promise<WebDriver> {
     '--no-sandbox',
     '--disable-dev-shm-usage',
     '--disable-popup-blocking',
+    '--disable-background-timer-throttling',
+    '--disable-backgrounding-occluded-windows',
+    '--disable-renderer-backgrounding',
   );
 
   if (config.headless) {
     options.addArguments('--headless=new', '--disable-gpu', '--window-size=1440,900');
   } else if (config.record || config.presentation) {
-    options.addArguments(
-      '--start-maximized',
-      '--window-position=0,0',
-      '--disable-backgrounding-occluded-windows',
-      '--disable-renderer-backgrounding',
-    );
+    options.addArguments('--start-maximized', '--window-position=0,0');
   } else {
     options.addArguments('--window-size=1440,900');
   }
 
-  const driver = await new Builder()
-    .forBrowser('chrome')
-    .setChromeOptions(options)
-    .build();
+  const driver = await new Builder().forBrowser('chrome').setChromeOptions(options).build();
 
   await driver.manage().setTimeouts({
     implicit: config.implicitWaitMs,

@@ -71,5 +71,10 @@ export async function pollFor<T>(
     }
     await new Promise((resolve) => setTimeout(resolve, intervalMs));
   }
+
+  const finalResult = await probe();
+  if (finalResult !== undefined) {
+    return finalResult;
+  }
   throw new Error(`Timed out waiting for ${description}.`);
 }
