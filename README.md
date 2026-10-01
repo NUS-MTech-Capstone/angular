@@ -25,6 +25,11 @@ does not store production bearer or PKCE tokens.
 - Session stop uses `POST /sessions/{gatewaySessionId}/close`.
 - Active session lists use `GET /sessions`.
 - WebSockets connect directly to `/sessions/{sessionId}/ws`.
+- Open terminal WebSockets send an empty `0x11` heartbeat every 30 seconds so
+  transport idle timeouts do not interrupt a live browser tab.
+- After 15 minutes without terminal input, output, or resize activity, the
+  client sends `0x12`, detaches gracefully, and leaves the persistent session
+  available for rejoin. Heartbeats do not reset this application idle timer.
 - Users with `session-audit.view` can open `/session-audit` to review retained
   SSH command/output audit fetched from `/ddm/session-audit`; this page is a
   read-only REST view and never opens a terminal observer WebSocket.

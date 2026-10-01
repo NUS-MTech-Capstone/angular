@@ -3,7 +3,6 @@ import {
   NavigationEnd,
   Router,
   RouterLink,
-  RouterLinkActive,
   RouterOutlet,
 } from '@angular/router';
 import { NzAvatarModule } from 'ng-zorro-antd/avatar';
@@ -18,6 +17,7 @@ interface NavItem {
   label: string;
   icon: string;
   link: string | null;
+  activePrefixes?: string[];
   permission?: string;
 }
 
@@ -25,7 +25,6 @@ interface NavItem {
   selector: 'app-root',
   imports: [
     RouterLink,
-    RouterLinkActive,
     RouterOutlet,
     NzAvatarModule,
     NzDropDownModule,
@@ -42,23 +41,23 @@ export class App {
 
   isTerminalRoute = false;
   isAuthPage = false;
+  currentPath = '';
 
   navItems: NavItem[] = [
     { label: 'Access', icon: 'safety', link: '/access', permission: 'access.view' },
     { label: 'Resources', icon: 'cluster', link: '/inventory', permission: 'inventory.view' },
     { label: 'Change Management', icon: 'file-sync', link: '/change-management', permission: 'change.view' },
-    { label: 'Agentic AI', icon: 'robot', link: '/agentic-ai/alerts' },
-    { label: 'Audit', icon: 'audit', link: '/audit', permission: 'session-audit.view' },
+    { label: 'Agentic AI', icon: 'robot', link: '/agentic-ai/alerts', activePrefixes: ['/agentic-ai'] },
+    { label: 'Audit', icon: 'audit', link: '/audit', activePrefixes: ['/audit', '/session-audit'], permission: 'session-audit.view' },
     { label: 'Identity', icon: 'idcard', link: '/identity', permission: 'identity.users.view' },
   ];
 
   constructor() {
+    this.updateRouteState(this.router.url);
     this.router.events
       .pipe(filter((event) => event instanceof NavigationEnd))
       .subscribe((event) => {
-        const url = (event as NavigationEnd).urlAfterRedirects;
-        this.isTerminalRoute = url.startsWith('/terminal');
-        this.isAuthPage = url.startsWith('/login') || url.startsWith('/auth/');
+        this.updateRouteState((event as NavigationEnd).urlAfterRedirects);
       });
   }
 
@@ -67,6 +66,15 @@ export class App {
       return true;
     }
     return !item.permission || this.auth.hasPermission(item.permission);
+  }
+
+  isNavItemActive(item: NavItem): boolean {
+    if (!item.link) {
+      return false;
+    }
+    return (item.activePrefixes ?? [item.link]).some(
+      (prefix) => this.currentPath === prefix || this.currentPath.startsWith(`${prefix}/`),
+    );
   }
 
   get displayName(): string {
@@ -84,5 +92,11 @@ export class App {
 
   logout(): void {
     this.auth.logout();
+  }
+
+  private updateRouteState(url: string): void {
+    this.currentPath = url.split(/[?#]/, 1)[0] || '/';
+    this.isTerminalRoute = this.currentPath.startsWith('/terminal');
+    this.isAuthPage = this.currentPath.startsWith('/login') || this.currentPath.startsWith('/auth/');
   }
 }

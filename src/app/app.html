@@ -37,7 +37,7 @@
         @for (item of navItems; track item.label) {
           @if (canShow(item)) {
             @if (item.link) {
-              <li class="rail-item" [routerLink]="item.link" routerLinkActive="active">
+              <li class="rail-item" [routerLink]="item.link" [class.active]="isNavItemActive(item)">
                 <span nz-icon [nzType]="item.icon"></span>
                 <span class="rail-label">{{ item.label }}</span>
               </li>

@@ -31,6 +31,8 @@ const enum PktType {
   Error = 0x02,
   SessionEvent = 0x07,
   Resize = 0x10,
+  Heartbeat = 0x11,
+  ClientClose = 0x12,
 }
 
 interface TerminalSettings {
@@ -56,6 +58,8 @@ interface AttachmentEvent {
 }
 
 const SETTINGS_STORAGE_KEY = 'ddm-terminal-settings';
+const HEARTBEAT_INTERVAL_MS = 30_000;
+const TERMINAL_IDLE_TIMEOUT_MS = 15 * 60_000;
 
 const DEFAULT_SETTINGS: TerminalSettings = {
   theme: 'Dark Slate',
@@ -170,6 +174,8 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
   private ws: WebSocket | null = null;
   private encoder = new TextEncoder();
   private sessionLog: string[] = [];
+  private connectionTimer: ReturnType<typeof setInterval> | null = null;
+  private lastTerminalActivityAt = 0;
   private terminalMouseUpHandler = (event: MouseEvent) => this.onTerminalMouseUp(event);
   private terminalAuxClickHandler = (event: MouseEvent) => this.onTerminalAuxClick(event);
   private resizeHandler = () => {
@@ -235,6 +241,7 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
     window.removeEventListener('resize', this.resizeHandler);
     this.terminalHost?.nativeElement.removeEventListener('mouseup', this.terminalMouseUpHandler);
     this.terminalHost?.nativeElement.removeEventListener('auxclick', this.terminalAuxClickHandler);
+    this.stopConnectionTimer();
     this.ws?.close();
     this.term?.dispose();
   }
@@ -313,6 +320,8 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
       this.connecting = false;
       this.connectionError = '';
       this.logEvent(`WebSocket open: ${this.osUser}@${this.ip} (${this.crNumber})`);
+      this.recordTerminalActivity();
+      this.startConnectionTimer();
       this.sendResize();
       this.cd.detectChanges();
     };
@@ -328,6 +337,7 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
     };
 
     ws.onclose = (event: CloseEvent) => {
+      this.stopConnectionTimer();
       this.connected = false;
       this.connecting = false;
       this.ws = null;
@@ -339,6 +349,7 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
   }
 
   reconnect(): void {
+    this.stopConnectionTimer();
     this.ws?.close();
     this.ws = null;
     this.term.reset();
@@ -362,6 +373,7 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
     packet[0] = PktType.Input;
     packet.set(dataBytes, 1);
     this.ws.send(packet.buffer);
+    this.recordTerminalActivity();
   }
 
   /** Inform the server of the current terminal dimensions (big-endian cols + rows). */
@@ -378,6 +390,47 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
     packet[3] = (rows >> 8) & 0xff;
     packet[4] = rows & 0xff;
     this.ws.send(packet.buffer);
+    this.recordTerminalActivity();
+  }
+
+  private startConnectionTimer(): void {
+    this.stopConnectionTimer();
+    this.connectionTimer = setInterval(() => {
+      if (Date.now() - this.lastTerminalActivityAt >= TERMINAL_IDLE_TIMEOUT_MS) {
+        this.detachForIdleTimeout();
+        return;
+      }
+      this.sendHeartbeat();
+    }, HEARTBEAT_INTERVAL_MS);
+  }
+
+  private stopConnectionTimer(): void {
+    if (this.connectionTimer !== null) {
+      clearInterval(this.connectionTimer);
+      this.connectionTimer = null;
+    }
+  }
+
+  private sendHeartbeat(): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    this.ws.send(new Uint8Array([PktType.Heartbeat]).buffer);
+  }
+
+  private recordTerminalActivity(): void {
+    this.lastTerminalActivityAt = Date.now();
+  }
+
+  private detachForIdleTimeout(): void {
+    const ws = this.ws;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    this.stopConnectionTimer();
+    const message = 'Disconnected after 15 minutes of inactivity. Rejoin to continue.';
+    this.connectionError = message;
+    this.writeLine(`\r\n\x1b[33m${message}\x1b[0m`);
+    this.logEvent('WebSocket detached after 15 minutes of inactivity');
+    ws.send(new Uint8Array([PktType.ClientClose]).buffer);
+    ws.close(1000, 'idle timeout');
+    this.cd.detectChanges();
   }
 
   private ringBell(): void {
@@ -472,6 +525,7 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
       case PktType.Output:
         if (payload.length > 0) {
           this.term.write(new TextDecoder().decode(payload));
+          this.recordTerminalActivity();
         }
         break;
       case PktType.Error: {

@@ -58,5 +58,14 @@ describe('App', () => {
     expect(app.displayName).toBe('fallback-user');
     auth.user.mockReturnValue(null);
     expect(app.avatarInitial).toBe('?');
+
+    app.currentPath = '/agentic-ai/incidents';
+    expect(app.isNavItemActive(app.navItems[3])).toBe(true);
+    expect(app.isNavItemActive(app.navItems[4])).toBe(false);
+
+    app.currentPath = '/audit';
+    expect(app.isNavItemActive(app.navItems[4])).toBe(true);
+    app.currentPath = '/session-audit';
+    expect(app.isNavItemActive(app.navItems[4])).toBe(true);
   });
 });
