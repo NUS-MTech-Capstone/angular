@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { NzButtonModule } from 'ng-zorro-antd/button';
@@ -14,6 +14,7 @@ import { NzSelectModule } from 'ng-zorro-antd/select';
 import { NzSpinModule } from 'ng-zorro-antd/spin';
 import { NzTableModule } from 'ng-zorro-antd/table';
 import { NzTagModule } from 'ng-zorro-antd/tag';
+import { finalize } from 'rxjs/operators';
 import {
   AgentHealth,
   AlertStatus,
@@ -77,6 +78,7 @@ export class AgenticAiAlerts implements OnInit {
   constructor(
     private incidentAgent: IncidentAgentService,
     private message: NzMessageService,
+    private cd: ChangeDetectorRef,
   ) {}
 
   ngOnInit(): void {
@@ -84,6 +86,9 @@ export class AgenticAiAlerts implements OnInit {
   }
 
   refresh(): void {
+    if (this.isLoading || this.isLoadingHealth) {
+      return;
+    }
     this.loadHealth();
     this.loadAlerts();
   }
@@ -118,13 +123,14 @@ export class AgenticAiAlerts implements OnInit {
 
   loadAlerts(): void {
     this.isLoading = true;
-    this.incidentAgent.listAlerts().subscribe({
+    this.incidentAgent.listAlerts().pipe(finalize(() => {
+      this.isLoading = false;
+      this.cd.detectChanges();
+    })).subscribe({
       next: (response) => {
         this.alerts = response.alerts ?? [];
-        this.isLoading = false;
       },
       error: (error: unknown) => {
-        this.isLoading = false;
         this.message.error(this.errorMessage(error, 'Failed to load alerts'));
       },
     });
@@ -132,13 +138,14 @@ export class AgenticAiAlerts implements OnInit {
 
   loadHealth(): void {
     this.isLoadingHealth = true;
-    this.incidentAgent.getHealth().subscribe({
+    this.incidentAgent.getHealth().pipe(finalize(() => {
+      this.isLoadingHealth = false;
+      this.cd.detectChanges();
+    })).subscribe({
       next: (health) => {
         this.health = health;
-        this.isLoadingHealth = false;
       },
       error: (error: unknown) => {
-        this.isLoadingHealth = false;
         this.message.error(this.errorMessage(error, 'Failed to load agent health'));
       },
     });
@@ -147,14 +154,15 @@ export class AgenticAiAlerts implements OnInit {
   openAlert(alert: ManagedAlert): void {
     this.isDrawerOpen = true;
     this.isLoadingDetail = true;
-    this.incidentAgent.getAlert(alert.id).subscribe({
+    this.incidentAgent.getAlert(alert.id).pipe(finalize(() => {
+      this.isLoadingDetail = false;
+      this.cd.detectChanges();
+    })).subscribe({
       next: (detail) => {
         this.selectedAlert = detail;
         this.replaceAlert(detail);
-        this.isLoadingDetail = false;
       },
       error: (error: unknown) => {
-        this.isLoadingDetail = false;
         this.message.error(this.errorMessage(error, 'Failed to load alert'));
       },
     });

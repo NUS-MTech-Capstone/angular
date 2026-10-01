@@ -161,8 +161,10 @@ describe('TerminalPage', () => {
   });
 
   afterEach(() => {
+    fixture.destroy();
     httpMock.verify();
     vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   it('should create', () => {
@@ -203,6 +205,45 @@ describe('TerminalPage', () => {
     const packet = new Uint8Array(ws.send.mock.calls[1][0] as ArrayBuffer);
     expect(packet[0]).toBe(0x00);
     expect(new TextDecoder().decode(packet.slice(1))).toBe('ls\r');
+  });
+
+  it('sends empty heartbeat packets without counting them as terminal activity', () => {
+    vi.useFakeTimers();
+    const ws = openMockWebSocket();
+
+    vi.advanceTimersByTime(30_000);
+
+    const packet = new Uint8Array(ws.send.mock.calls[1][0] as ArrayBuffer);
+    expect(Array.from(packet)).toEqual([0x11]);
+  });
+
+  it('gracefully detaches after fifteen minutes without terminal activity', () => {
+    vi.useFakeTimers();
+    const ws = openMockWebSocket();
+
+    vi.advanceTimersByTime(15 * 60_000);
+
+    const packet = new Uint8Array(ws.send.mock.calls.at(-1)?.[0] as ArrayBuffer);
+    expect(Array.from(packet)).toEqual([0x12]);
+    expect(ws.close).toHaveBeenCalledWith(1000, 'idle timeout');
+    expect(component.connectionError).toContain('15 minutes');
+  });
+
+  it('resets the idle deadline for terminal input and output', async () => {
+    vi.useFakeTimers();
+    const ws = openMockWebSocket();
+    vi.advanceTimersByTime(14 * 60_000);
+
+    onDataHandler?.('pwd\r');
+    vi.advanceTimersByTime(14 * 60_000);
+    expect(ws.close).not.toHaveBeenCalled();
+
+    const output = new Uint8Array([0x01, ...new TextEncoder().encode('still active')]);
+    ws.onmessage?.({ data: output.buffer } as MessageEvent);
+    await Promise.resolve();
+    vi.advanceTimersByTime(14 * 60_000);
+
+    expect(ws.close).not.toHaveBeenCalled();
   });
 
   it('writes server output packets to xterm', async () => {

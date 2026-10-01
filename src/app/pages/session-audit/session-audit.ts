@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { NzAlertModule } from 'ng-zorro-antd/alert';
@@ -13,6 +13,7 @@ import { NzSpinModule } from 'ng-zorro-antd/spin';
 import { NzTabsModule } from 'ng-zorro-antd/tabs';
 import { NzTableModule } from 'ng-zorro-antd/table';
 import { NzTagModule } from 'ng-zorro-antd/tag';
+import { finalize } from 'rxjs/operators';
 import {
   AlertStatus,
   CloudWatchState,
@@ -226,6 +227,7 @@ export class SessionAudit implements OnInit {
     private message: NzMessageService,
     private route: ActivatedRoute,
     private router: Router,
+    private cd: ChangeDetectorRef,
   ) {}
 
   ngOnInit(): void {
@@ -239,6 +241,7 @@ export class SessionAudit implements OnInit {
   }
 
   loadSessions(cursor?: string, keepSelected = false, allowFallback = true): void {
+    if (this.isLoadingSessions) return;
     this.isLoadingSessions = true;
     this.sessionAudit.listSessions({
       sessionId: this.filters.sessionId || undefined,
@@ -249,7 +252,7 @@ export class SessionAudit implements OnInit {
       to: this.toIso(this.filters.to),
       limit: 50,
       cursor,
-    }).subscribe({
+    }).pipe(finalize(() => this.cd.detectChanges())).subscribe({
       next: (response) => {
         const sessions = response.sessions ?? [];
         if (!cursor && allowFallback && sessions.length === 0 && this.hasSessionFilters()) {
@@ -282,7 +285,8 @@ export class SessionAudit implements OnInit {
   }
 
   private loadRecentSessionsFallback(keepSelected: boolean): void {
-    this.sessionAudit.listSessions({ limit: 50 }).subscribe({
+    this.sessionAudit.listSessions({ limit: 50 })
+      .pipe(finalize(() => this.cd.detectChanges())).subscribe({
       next: (response) => {
         const sessions = response.sessions ?? [];
         this.sessions = sessions;
@@ -303,6 +307,7 @@ export class SessionAudit implements OnInit {
   }
 
   loadAuditRecords(cursor?: string): void {
+    if (this.isLoadingAuditRecords) return;
     this.isLoadingAuditRecords = true;
     this.sessionAudit.listAuditRecords({
       sessionId: this.recordFilters.sessionId || undefined,
@@ -314,7 +319,7 @@ export class SessionAudit implements OnInit {
       to: this.toIso(this.recordFilters.to),
       limit: 100,
       cursor,
-    }).subscribe({
+    }).pipe(finalize(() => this.cd.detectChanges())).subscribe({
       next: (response) => {
         const records = response.records ?? [];
         this.auditRecords = cursor ? [...this.auditRecords, ...records] : records;
@@ -330,6 +335,7 @@ export class SessionAudit implements OnInit {
   }
 
   loadAgenticAudit(cursor?: string): void {
+    if (this.isLoadingAgentic) return;
     this.isLoadingAgentic = true;
     this.incidentAgent.listEvents({
       incidentId: this.agentFilters.incidentId || undefined,
@@ -340,7 +346,7 @@ export class SessionAudit implements OnInit {
       to: this.toIso(this.agentFilters.to),
       limit: 100,
       cursor,
-    }).subscribe({
+    }).pipe(finalize(() => this.cd.detectChanges())).subscribe({
       next: (response) => {
         const events = response.events ?? [];
         this.agentEvents = cursor ? [...this.agentEvents, ...events] : events;
@@ -369,7 +375,7 @@ export class SessionAudit implements OnInit {
       to: this.toIso(this.agentFilters.to),
       limit: 50,
       cursor,
-    }).subscribe({
+    }).pipe(finalize(() => this.cd.detectChanges())).subscribe({
       next: (response) => {
         const alerts = response.alerts ?? [];
         this.agentAlerts = cursor ? [...this.agentAlerts, ...alerts] : alerts;
@@ -389,7 +395,7 @@ export class SessionAudit implements OnInit {
       to: this.toIso(this.agentFilters.to),
       limit: 50,
       cursor,
-    }).subscribe({
+    }).pipe(finalize(() => this.cd.detectChanges())).subscribe({
       next: (response) => {
         const incidents = response.incidents ?? [];
         this.agentIncidents = cursor ? [...this.agentIncidents, ...incidents] : incidents;
@@ -448,9 +454,10 @@ export class SessionAudit implements OnInit {
   }
 
   loadRecords(cursor?: string): void {
-    if (!this.selectedSession) return;
+    if (!this.selectedSession || this.isLoadingRecords) return;
     this.isLoadingRecords = true;
-    this.sessionAudit.listRecords(this.selectedSession.sessionId, SESSION_RECORD_LIMIT, cursor).subscribe({
+    this.sessionAudit.listRecords(this.selectedSession.sessionId, SESSION_RECORD_LIMIT, cursor)
+      .pipe(finalize(() => this.cd.detectChanges())).subscribe({
       next: (response) => {
         const records = response.records ?? [];
         this.setRecords(cursor ? [...this.records, ...records] : records);
@@ -857,7 +864,7 @@ export class SessionAudit implements OnInit {
     if (!this.auth.hasPermission('identity.users.view')) {
       return;
     }
-    this.identityService.listUsers().subscribe({
+    this.identityService.listUsers().pipe(finalize(() => this.cd.detectChanges())).subscribe({
       next: (users) => {
         this.userDisplayBySub = this.buildUserDisplayMap(users ?? []);
       },

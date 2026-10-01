@@ -120,6 +120,7 @@ describe('SessionAudit', () => {
       message as any,
       route as any,
       router as any,
+      { detectChanges: vi.fn() } as any,
     );
   });
 
