@@ -1,4 +1,5 @@
 import {
+  ArrowLeftOutline,
   AuditOutline,
   BellOutline,
   CheckCircleOutline,
@@ -29,7 +30,9 @@ import {
   PlusOutline,
   QuestionCircleOutline,
   ReloadOutline,
+  RightOutline,
   RobotOutline,
+  SafetyCertificateOutline,
   SafetyOutline,
   SearchOutline,
   SettingOutline,
@@ -41,6 +44,7 @@ import {
 } from '@ant-design/icons-angular/icons';
 
 export const icons = [
+  ArrowLeftOutline,
   AuditOutline,
   BellOutline,
   CheckCircleOutline,
@@ -71,7 +75,9 @@ export const icons = [
   PlusOutline,
   QuestionCircleOutline,
   ReloadOutline,
+  RightOutline,
   RobotOutline,
+  SafetyCertificateOutline,
   SafetyOutline,
   SearchOutline,
   SettingOutline,

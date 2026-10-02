@@ -5,165 +5,33 @@ import { provideNzIcons } from 'ng-zorro-antd/icon';
 import { NzMessageService } from 'ng-zorro-antd/message';
 import { of, throwError } from 'rxjs';
 import { icons } from '../../icons-provider';
-import {
-  IncidentAgentService,
-  IncidentDetail,
-  ManagedAlert,
-  ManagedAlertDetail,
-} from '../../services/incident-agent.service';
+import { IncidentAgentService } from '../../services/incident-agent.service';
 import { AgenticAiAlerts } from './agentic-ai-alerts';
-
-const incident = (): IncidentDetail => ({
-  id: 'inc-1',
-  sourceId: 'alarm-source',
-  alarmArn: 'arn:alarm',
-  alarmName: 'High 5xx',
-  hostId: 'host-dev-1',
-  state: 'AWAITING_APPROVAL',
-  reason: 'service unhealthy',
-  runbookVersion: 'v1',
-  planHash: 'hash-1',
-  approvalDecision: '',
-  approvalAt: null,
-  createdAt: '2026-01-01T00:00:00Z',
-  updatedAt: '2026-01-01T00:05:00Z',
-  evidence: [],
-  triage: {
-    priority: 'high',
-    category: 'availability',
-    summary: 'service unhealthy',
-    rationale: 'alarm is in ALARM',
-  },
-  plan: {
-    summary: 'Restart service',
-    rationale: 'Health check failed',
-    actions: [{ operationId: 'restart_service', reason: 'recover service' }],
-  },
-  explanation: {
-    model: {
-      provider: 'bedrock',
-      plannerType: 'bedrock',
-      modelId: 'global.amazon.nova-2-lite-v1:0',
-      awsRegion: 'ap-southeast-1',
-      temperature: 0,
-      maxPromptBytes: 131072,
-      promptTemplates: { 'plan_system.md.j2': 'hash' },
-    },
-    workflow: {
-      graphVersion: 'v1',
-      catalogVersion: 'v1',
-      diagnosticOperations: ['target_probe', 'health_check'],
-      verificationOperations: ['service_status', 'health_check'],
-      runId: 'run-1',
-      planHash: 'hash-1',
-    },
-    agents: [
-      {
-        name: 'Action Plan Agent',
-        purpose: 'Propose a structured remediation plan from bounded evidence.',
-        responsibilities: ['Suggest only operation IDs in structured plan output.'],
-        reasoningType: 'Bedrock LLM structured reasoning',
-        memory: 'incident-local evidence context only; no long-term memory',
-        tools: ['Bedrock via LangChain'],
-        inputs: ['incident metadata', 'bounded diagnostic evidence'],
-        outputs: ['candidate Plan'],
-        handoffTo: 'Action Plan Reviewer Agent',
-      },
-    ],
-    toolDecisions: [
-      { operationId: 'target_probe', phase: 'diagnose', chosenBy: 'policy', reason: 'default diagnostic' },
-    ],
-    guardrails: [{ name: 'catalog_validation', passed: true, reason: 'operation is supported' }],
-    responsibility: {
-      modelAdvisory: true,
-      humanApprovalRequired: true,
-      executionOwner: 'agent-controlplane',
-      tokenIssuer: 'sts',
-      terminalTraffic: 'not handled by incident-agent or agent-controlplane',
-    },
-  },
-  planExpiresAt: '2026-01-01T00:35:00Z',
-  isPlanExpired: false,
-  approverSubject: '',
-  report: '',
-  errorMessage: '',
-  postIncidentStatus: '',
-  postIncidentSummary: '',
-  postIncidentReport: {
-    rootCauseSummary: '',
-    actionTaken: '',
-    verificationSummary: '',
-    finalState: '',
-    startedAt: null,
-    resolvedAt: null,
-    durationSeconds: null,
-  },
-  timeline: [
-    {
-      id: 'evt-1',
-      incidentId: 'inc-1',
-      alertId: 'alert-1',
-      eventType: 'AlertGrouped',
-      actor: '',
-      message: 'Alert grouped',
-      metadata: {},
-      createdAt: '2026-01-01T00:05:00Z',
-    },
-  ],
-  approvalDecisions: [],
-});
-
-const alert = (status: ManagedAlert['status'] = 'PENDING_APPROVAL'): ManagedAlertDetail => ({
-  id: 'alert-1',
-  sourceId: 'arn:alarm|2026-01-01T00:00:00Z|ALARM',
-  sourceType: 'managed-server',
-  alarmArn: 'arn:alarm',
-  alarmName: 'High 5xx',
-  cloudwatchState: 'ALARM',
-  hostId: 'host-dev-1',
-  reason: 'threshold breached',
-  status,
-  groupKey: 'managed-server|host-dev-1|High 5xx',
-  incidentId: 'inc-1',
-  grouped: false,
-  errorSummary: '',
-  occurredAt: '2026-01-01T00:00:00Z',
-  createdAt: '2026-01-01T00:00:01Z',
-  updatedAt: '2026-01-01T00:05:00Z',
-  incident: incident(),
-});
+import { alertFixture } from './agentic-ai.test-fixtures';
 
 describe('AgenticAiAlerts', () => {
   let component: AgenticAiAlerts;
   let fixture: ComponentFixture<AgenticAiAlerts>;
   let incidentAgent: {
     listAlerts: ReturnType<typeof vi.fn>;
-    getAlert: ReturnType<typeof vi.fn>;
     getHealth: ReturnType<typeof vi.fn>;
   };
-  let message: {
-    error: ReturnType<typeof vi.fn>;
-  };
+  let message: { error: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
     incidentAgent = {
-      listAlerts: vi.fn(() => of({ alerts: [alert()] })),
-      getAlert: vi.fn(() => of(alert())),
-      getHealth: vi.fn(() =>
-        of({
-          databaseReady: true,
-          queueConsumerConfigured: true,
-          queueConsumerRunning: true,
-          lastAlertProcessedAt: '2026-01-01T00:00:00Z',
-          lastErrorSummary: '',
-          activeIncidentCount: 1,
-          failedIncidentCount: 0,
-        }),
-      ),
+      listAlerts: vi.fn(() => of({ alerts: [alertFixture()] })),
+      getHealth: vi.fn(() => of({
+        databaseReady: true,
+        queueConsumerConfigured: true,
+        queueConsumerRunning: true,
+        lastAlertProcessedAt: '2026-01-01T00:00:00Z',
+        lastErrorSummary: '',
+        activeIncidentCount: 1,
+        failedIncidentCount: 0,
+      })),
     };
-    message = {
-      error: vi.fn(),
-    };
+    message = { error: vi.fn() };
 
     await TestBed.configureTestingModule({
       imports: [AgenticAiAlerts],
@@ -181,58 +49,32 @@ describe('AgenticAiAlerts', () => {
     await fixture.whenStable();
   });
 
-  it('loads alerts and computes status counts', () => {
+  it('loads supporting alert context and links to a dedicated detail page', () => {
     expect(component.alerts).toHaveLength(1);
     expect(component.health?.databaseReady).toBe(true);
     expect(component.pendingApprovalCount).toBe(1);
-
-    component.alerts = [alert('RECEIVED'), alert('RESOLVED'), alert('FAILED')];
-
-    expect(component.activeCount).toBe(1);
-    expect(component.resolvedCount).toBe(1);
-    expect(component.failedCount).toBe(1);
-  });
-
-  it('treats null alert lists as empty', () => {
-    incidentAgent.listAlerts.mockReturnValueOnce(of({ alerts: null } as any));
-
-    component.loadAlerts();
-
-    expect(component.alerts).toEqual([]);
-    expect(component.filteredAlerts).toEqual([]);
+    expect(fixture.nativeElement.querySelector('a[href="/agentic-ai/alerts/alert-1"]')).not.toBeNull();
+    expect((component as unknown as Record<string, unknown>)['isDrawerOpen']).toBeUndefined();
   });
 
   it('filters alerts by status, CloudWatch state, and host', () => {
     component.alerts = [
-      alert('PENDING_APPROVAL'),
-      { ...alert('RESOLVED'), id: 'alert-2', hostId: 'db-1', cloudwatchState: 'OK' },
+      alertFixture(),
+      { ...alertFixture(), id: 'alert-2', status: 'RESOLVED', hostId: 'db-1', cloudwatchState: 'OK' },
     ];
-
     component.statusFilter = 'RESOLVED';
     component.cloudwatchFilter = 'OK';
     component.hostFilter = 'db';
 
-    expect(component.filteredAlerts).toHaveLength(1);
-    expect(component.filteredAlerts[0].id).toBe('alert-2');
+    expect(component.filteredAlerts.map((alert) => alert.id)).toEqual(['alert-2']);
   });
 
-  it('loads alert detail into the drawer', () => {
-    component.openAlert(alert());
+  it('treats a null alert list as empty', () => {
+    incidentAgent.listAlerts.mockReturnValueOnce(of({ alerts: null } as never));
 
-    expect(incidentAgent.getAlert).toHaveBeenCalledWith('alert-1');
-    expect(component.isDrawerOpen).toBe(true);
-    expect(component.selectedAlert?.incident?.plan.summary).toBe('Restart service');
-    expect(component.selectedAlert?.incident?.timeline[0].eventType).toBe('AlertGrouped');
-  });
+    component.loadAlerts();
 
-  it('reports alert load errors', () => {
-    incidentAgent.getAlert.mockReturnValueOnce(
-      throwError(() => new HttpErrorResponse({ status: 404, statusText: 'Not found' })),
-    );
-
-    component.openAlert(alert());
-
-    expect(message.error).toHaveBeenCalledWith('Alert not found');
+    expect(component.alerts).toEqual([]);
   });
 
   it('reports health errors without clearing alerts', () => {

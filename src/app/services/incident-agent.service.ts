@@ -27,9 +27,12 @@ export type IncidentEventType =
   | 'AlertReceived'
   | 'AlertGrouped'
   | 'IncidentCreated'
+  | 'IncidentProcessingReclaimed'
+  | 'AgentDelegated'
   | 'AgentTriaged'
   | 'EvidenceCollected'
   | 'PlanProposed'
+  | 'PlanValidationFailed'
   | 'PlanExpired'
   | 'PlanApproved'
   | 'PlanRejected'
@@ -118,6 +121,7 @@ export interface ExplanationModel {
   plannerType: string;
   modelId: string;
   awsRegion: string;
+  gatewayRoute?: string;
   temperature?: number | null;
   maxPromptBytes: number;
   promptTemplates: Record<string, string>;
@@ -165,6 +169,44 @@ export interface ExplanationResponsibility {
   terminalTraffic: string;
 }
 
+export type ExplanationActionStatus = 'SUCCEEDED' | 'FALLBACK' | 'FAILED';
+export type ExplanationToolStatus = 'SUCCEEDED' | 'FAILED';
+export type ExplanationToolPhase = 'diagnose' | 'remediate' | 'verify';
+
+export interface ExplanationAgentAction {
+  eventId: string;
+  stage: string;
+  fromAgent: string;
+  toAgent: string;
+  protocol: string;
+  actorType: 'MODEL_ASSISTED' | 'DETERMINISTIC';
+  status: ExplanationActionStatus;
+  summary: string;
+  durationMs: number;
+  fallbackUsed: boolean;
+  occurredAt: string;
+}
+
+export interface ExplanationToolCall {
+  eventId: string;
+  operationId: string;
+  phase: ExplanationToolPhase;
+  selectedBy: string;
+  status: ExplanationToolStatus;
+  reason: string;
+  durationMs: number;
+  exitCode: number;
+  resultDigest: string;
+  outputTruncated: boolean;
+  occurredAt: string;
+}
+
+export interface ExplanationTrace {
+  schemaVersion: 'v1';
+  agentActions: ExplanationAgentAction[];
+  toolCalls: ExplanationToolCall[];
+}
+
 export interface IncidentExplanation {
   model: ExplanationModel;
   workflow: ExplanationWorkflow;
@@ -172,6 +214,7 @@ export interface IncidentExplanation {
   toolDecisions: ExplanationToolDecision[];
   guardrails: ExplanationGuardrail[];
   responsibility: ExplanationResponsibility;
+  trace?: ExplanationTrace;
 }
 
 export interface IncidentEvent {
@@ -362,6 +405,11 @@ export class IncidentAgentService {
         agents: detail.explanation?.agents ?? [],
         toolDecisions: detail.explanation?.toolDecisions ?? [],
         guardrails: detail.explanation?.guardrails ?? [],
+        trace: {
+          schemaVersion: 'v1',
+          agentActions: detail.explanation?.trace?.agentActions ?? [],
+          toolCalls: detail.explanation?.trace?.toolCalls ?? [],
+        },
       },
       timeline: detail.timeline ?? [],
       approvalDecisions: detail.approvalDecisions ?? [],

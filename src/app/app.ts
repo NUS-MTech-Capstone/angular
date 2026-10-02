@@ -47,7 +47,7 @@ export class App {
     { label: 'Access', icon: 'safety', link: '/access', permission: 'access.view' },
     { label: 'Resources', icon: 'cluster', link: '/inventory', permission: 'inventory.view' },
     { label: 'Change Management', icon: 'file-sync', link: '/change-management', permission: 'change.view' },
-    { label: 'Agentic AI', icon: 'robot', link: '/agentic-ai/alerts', activePrefixes: ['/agentic-ai'] },
+    { label: 'Agentic AI', icon: 'robot', link: '/agentic-ai/incidents', activePrefixes: ['/agentic-ai'] },
     { label: 'Audit', icon: 'audit', link: '/audit', activePrefixes: ['/audit', '/session-audit'], permission: 'session-audit.view' },
     { label: 'Identity', icon: 'idcard', link: '/identity', permission: 'identity.users.view' },
   ];

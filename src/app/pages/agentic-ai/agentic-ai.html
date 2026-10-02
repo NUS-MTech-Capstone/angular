@@ -1,10 +1,8 @@
 <div class="agent-page">
-  <div class="page-header">
+  <div class="page-header compact-header">
     <div>
-      <h2>
-        <span nz-icon nzType="robot" nzTheme="outline"></span>
-        Agentic AI incidents
-      </h2>
+      <h2>Incidents</h2>
+      <p>Follow the investigation, human approval, bounded remediation, and verification outcome.</p>
     </div>
     <button nz-button nzType="default" (click)="loadIncidents()" [disabled]="isLoading">
       <span nz-icon nzType="reload" nzTheme="outline"></span>
@@ -12,23 +10,18 @@
     </button>
   </div>
 
-  <div class="section-tabs">
-    <a routerLink="/agentic-ai/alerts" routerLinkActive="active">Alerts</a>
-    <a routerLink="/agentic-ai/incidents" routerLinkActive="active">Incidents</a>
-  </div>
-
-  <div class="summary-strip">
+  <div class="summary-strip" aria-label="Incident summary">
     <div class="summary-item summary-item--approval">
       <span class="summary-value">{{ awaitingApprovalCount }}</span>
-      <span class="summary-label">Awaiting approval</span>
+      <span class="summary-label">Need a decision</span>
     </div>
     <div class="summary-item summary-item--running">
       <span class="summary-value">{{ executingCount }}</span>
-      <span class="summary-label">Executing</span>
+      <span class="summary-label">Executing safely</span>
     </div>
     <div class="summary-item summary-item--failed">
       <span class="summary-value">{{ failedCount }}</span>
-      <span class="summary-label">Failed</span>
+      <span class="summary-label">Need attention</span>
     </div>
     <div class="summary-item summary-item--closed">
       <span class="summary-value">{{ closedCount }}</span>
@@ -37,7 +30,7 @@
   </div>
 
   <div class="toolbar">
-    <nz-select class="state-filter" [(ngModel)]="stateFilter" nzSize="default">
+    <nz-select class="state-filter" [(ngModel)]="stateFilter" aria-label="Filter incidents by state">
       <nz-option *ngFor="let option of stateFilters" [nzValue]="option.value" [nzLabel]="option.label"></nz-option>
     </nz-select>
     <span class="result-count">{{ filteredIncidents.length }} incidents</span>
@@ -54,292 +47,41 @@
     [nzNoResult]="noIncidents">
     <thead>
       <tr>
-        <th>Alarm</th>
+        <th>Incident</th>
         <th nzWidth="160px">Host</th>
-        <th nzWidth="170px">State</th>
-        <th>Reason</th>
+        <th nzWidth="170px">Current state</th>
+        <th>What happened</th>
         <th nzWidth="170px">Updated</th>
-        <th nzWidth="120px">Actions</th>
+        <th nzWidth="120px"><span class="sr-only">Open</span></th>
       </tr>
     </thead>
     <tbody>
       <tr *ngFor="let incident of incidentTable.data">
         <td>
-          <button nz-button nzType="link" class="alarm-link" (click)="openIncident(incident)">
+          <a class="alarm-link" [routerLink]="['/agentic-ai/incidents', incident.id]">
             {{ incident.alarmName }}
-          </button>
+          </a>
+          <small class="secondary-id">{{ incident.id }}</small>
         </td>
         <td>{{ incident.hostId }}</td>
         <td>
-          <nz-tag [nzColor]="stateColor(incident.state)">{{ incident.state }}</nz-tag>
+          <nz-tag [nzColor]="stateColor(incident.state)" [attr.title]="incident.state">
+            {{ stateLabel(incident.state) }}
+          </nz-tag>
         </td>
-        <td class="reason-cell">{{ incident.reason || '-' }}</td>
+        <td class="reason-cell">{{ incident.reason || 'No additional alert context' }}</td>
         <td>{{ incident.updatedAt | date: 'short' }}</td>
         <td>
-          <button nz-button nzSize="small" (click)="openIncident(incident)">
-            <span nz-icon nzType="eye" nzTheme="outline"></span>
-            View
-          </button>
+          <a nz-button nzSize="small" [routerLink]="['/agentic-ai/incidents', incident.id]">
+            Review
+            <span nz-icon nzType="right" nzTheme="outline"></span>
+          </a>
         </td>
       </tr>
     </tbody>
   </nz-table>
 
   <ng-template #noIncidents>
-    <nz-empty nzNotFoundContent="No incidents"></nz-empty>
+    <nz-empty nzNotFoundContent="No incidents match this filter"></nz-empty>
   </ng-template>
-
-  <nz-drawer
-    [nzVisible]="isDrawerOpen"
-    [nzTitle]="selectedIncident?.alarmName || 'Incident detail'"
-    nzWidth="720px"
-    (nzOnClose)="closeDrawer()">
-    <ng-container *nzDrawerContent>
-      <nz-spin [nzSpinning]="isLoadingDetail">
-        <ng-container *ngIf="selectedIncident as incident">
-          <div class="drawer-actions">
-            <nz-tag [nzColor]="stateColor(incident.state)">{{ incident.state }}</nz-tag>
-            <nz-tag *ngIf="incident.isPlanExpired" nzColor="red">PLAN EXPIRED</nz-tag>
-            <a nz-button nzSize="small" routerLink="/audit" [queryParams]="sshAuditParams(incident)">
-              <span nz-icon nzType="audit" nzTheme="outline"></span>
-              SSH logs
-            </a>
-            <button
-              nz-button
-              nzType="primary"
-              nzSize="small"
-              *ngIf="canDecideIncident(incident)"
-              [nzLoading]="decidingIncidentId === incident.id"
-              (click)="approveIncident(incident)">
-              <span nz-icon nzType="check-circle" nzTheme="outline"></span>
-              Approve
-            </button>
-            <button
-              nz-button
-              nzDanger
-              nzSize="small"
-              *ngIf="canDecideIncident(incident)"
-              [nzLoading]="decidingIncidentId === incident.id"
-              (click)="rejectIncident(incident)">
-              <span nz-icon nzType="clear" nzTheme="outline"></span>
-              Reject
-            </button>
-          </div>
-
-          <nz-descriptions nzSize="small" [nzColumn]="1" nzBordered>
-            <nz-descriptions-item nzTitle="Incident ID">{{ incident.id }}</nz-descriptions-item>
-            <nz-descriptions-item nzTitle="Host">{{ incident.hostId }}</nz-descriptions-item>
-            <nz-descriptions-item nzTitle="Runbook">{{ incident.runbookVersion || '-' }}</nz-descriptions-item>
-            <nz-descriptions-item nzTitle="Reason">{{ incident.reason || '-' }}</nz-descriptions-item>
-            <nz-descriptions-item nzTitle="Plan hash">
-              <code>{{ incident.planHash || '-' }}</code>
-            </nz-descriptions-item>
-            <nz-descriptions-item nzTitle="Plan expiry">
-              {{ incident.planExpiresAt ? (incident.planExpiresAt | date: 'medium') : '-' }}
-            </nz-descriptions-item>
-            <nz-descriptions-item nzTitle="Approver">{{ incident.approverSubject || '-' }}</nz-descriptions-item>
-            <nz-descriptions-item nzTitle="Approval">{{ incident.approvalDecision || '-' }}</nz-descriptions-item>
-          </nz-descriptions>
-
-          <section class="detail-section" *ngIf="incident.triage">
-            <h3>Agent triage</h3>
-            <p class="plan-summary">{{ incident.triage.summary }}</p>
-            <p class="muted">{{ incident.triage.rationale }}</p>
-            <div class="action-row">
-              <code>{{ incident.triage.priority }}</code>
-              <span>{{ incident.triage.category }}</span>
-            </div>
-          </section>
-
-          <section class="detail-section" *ngIf="incident.plan.summary || incident.plan.actions.length">
-            <h3>Proposed plan</h3>
-            <p class="plan-summary">{{ incident.plan.summary || '-' }}</p>
-            <p class="muted">{{ incident.plan.rationale || '-' }}</p>
-            <div class="action-list">
-              <div class="action-row" *ngFor="let action of incident.plan.actions">
-                <code>{{ action.operationId }}</code>
-                <span>{{ action.reason }}</span>
-              </div>
-            </div>
-          </section>
-
-          <section class="detail-section" *ngIf="explanationAgents(incident).length">
-            <h3>Agents</h3>
-            <div class="agent-list">
-              <div class="agent-row" *ngFor="let agent of explanationAgents(incident)">
-                <div class="agent-heading">
-                  <div>
-                    <strong>{{ agent.name }}</strong>
-                    <p>{{ agent.purpose || '-' }}</p>
-                  </div>
-                  <nz-tag>{{ agent.reasoningType || 'unspecified' }}</nz-tag>
-                </div>
-
-                <div class="agent-meta">
-                  <span>
-                    <b>Memory</b>
-                    {{ agent.memory || '-' }}
-                  </span>
-                  <span>
-                    <b>Handoff</b>
-                    {{ agent.handoffTo || '-' }}
-                  </span>
-                </div>
-
-                <div class="agent-chip-group" *ngIf="agent.tools.length">
-                  <span class="agent-chip-label">Tools</span>
-                  <nz-tag *ngFor="let tool of agent.tools">{{ tool }}</nz-tag>
-                </div>
-
-                <div class="agent-flow">
-                  <div>
-                    <b>Inputs</b>
-                    <span>{{ agent.inputs.length ? agent.inputs.join(', ') : '-' }}</span>
-                  </div>
-                  <div>
-                    <b>Outputs</b>
-                    <span>{{ agent.outputs.length ? agent.outputs.join(', ') : '-' }}</span>
-                  </div>
-                </div>
-
-                <div class="agent-responsibilities" *ngIf="agent.responsibilities.length">
-                  <b>Responsibilities</b>
-                  <ul>
-                    <li *ngFor="let responsibility of agent.responsibilities">{{ responsibility }}</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section class="detail-section" *ngIf="hasExplanation(incident)">
-            <h3>Explainability</h3>
-            <nz-descriptions nzSize="small" [nzColumn]="1" nzBordered>
-              <nz-descriptions-item nzTitle="Planner">
-                {{ incident.explanation.model.plannerType || '-' }}
-                <span class="muted-inline">({{ incident.explanation.model.provider || '-' }})</span>
-              </nz-descriptions-item>
-              <nz-descriptions-item nzTitle="Model">
-                {{ incident.explanation.model.modelId || '-' }}
-                <span *ngIf="incident.explanation.model.awsRegion" class="muted-inline">
-                  {{ incident.explanation.model.awsRegion }}
-                </span>
-              </nz-descriptions-item>
-              <nz-descriptions-item nzTitle="Catalog">
-                {{ incident.explanation.workflow.catalogVersion || '-' }}
-              </nz-descriptions-item>
-              <nz-descriptions-item nzTitle="Responsibility">
-                {{ incident.explanation.responsibility.executionOwner || '-' }} issues no model authority;
-                {{ incident.explanation.responsibility.tokenIssuer || '-' }} issues runtime tokens.
-              </nz-descriptions-item>
-              <nz-descriptions-item nzTitle="Terminal traffic">
-                {{ incident.explanation.responsibility.terminalTraffic || '-' }}
-              </nz-descriptions-item>
-            </nz-descriptions>
-
-            <div class="explain-grid" *ngIf="incident.explanation.toolDecisions.length">
-              <div class="explain-row" *ngFor="let decision of incident.explanation.toolDecisions">
-                <code>{{ decision.operationId }}</code>
-                <nz-tag>{{ decision.phase }}</nz-tag>
-                <span>{{ decision.chosenBy }}</span>
-                <span>{{ decision.reason }}</span>
-              </div>
-            </div>
-
-            <div class="guardrail-list" *ngIf="incident.explanation.guardrails.length">
-              <div class="guardrail-row" *ngFor="let guardrail of incident.explanation.guardrails">
-                <nz-tag [nzColor]="guardrail.passed ? 'green' : 'red'">
-                  {{ guardrail.passed ? 'passed' : 'failed' }}
-                </nz-tag>
-                <code>{{ guardrail.name }}</code>
-                <span>{{ guardrail.reason || '-' }}</span>
-              </div>
-            </div>
-
-            <div class="target-probe" *ngIf="targetProbe(incident) as probe">
-              <div class="evidence-header">
-                <code>target_probe</code>
-                <nz-tag [nzColor]="probe.exitCode === 0 ? 'green' : 'red'">exit {{ probe.exitCode }}</nz-tag>
-              </div>
-              <pre>{{ probe.stdout }}{{ probe.stderr }}</pre>
-            </div>
-          </section>
-
-          <section class="detail-section" *ngIf="incident.evidence.length">
-            <h3>Evidence</h3>
-            <div class="evidence-row" *ngFor="let result of incident.evidence">
-              <div class="evidence-header">
-                <code>{{ result.operationId }}</code>
-                <nz-tag [nzColor]="result.exitCode === 0 ? 'green' : 'red'">exit {{ result.exitCode }}</nz-tag>
-              </div>
-              <pre>{{ result.stdout }}{{ result.stderr }}</pre>
-            </div>
-          </section>
-
-          <section class="detail-section" *ngIf="hasStructuredReport(incident) || incident.postIncidentSummary">
-            <h3>Post-incident report</h3>
-            <nz-descriptions *ngIf="hasStructuredReport(incident); else plainReport" nzSize="small" [nzColumn]="1" nzBordered>
-              <nz-descriptions-item nzTitle="Final state">
-                {{ incident.postIncidentReport.finalState || '-' }}
-              </nz-descriptions-item>
-              <nz-descriptions-item nzTitle="Root cause">
-                {{ incident.postIncidentReport.rootCauseSummary || '-' }}
-              </nz-descriptions-item>
-              <nz-descriptions-item nzTitle="Action taken">
-                {{ incident.postIncidentReport.actionTaken || '-' }}
-              </nz-descriptions-item>
-              <nz-descriptions-item nzTitle="Verification">
-                {{ incident.postIncidentReport.verificationSummary || '-' }}
-              </nz-descriptions-item>
-              <nz-descriptions-item nzTitle="Resolved">
-                {{ incident.postIncidentReport.resolvedAt ? (incident.postIncidentReport.resolvedAt | date: 'medium') : '-' }}
-              </nz-descriptions-item>
-              <nz-descriptions-item nzTitle="Duration">
-                {{ incident.postIncidentReport.durationSeconds ?? '-' }}
-              </nz-descriptions-item>
-            </nz-descriptions>
-            <ng-template #plainReport>
-              <nz-tag *ngIf="incident.postIncidentStatus" [nzColor]="stateColor(incident.state)">
-                {{ incident.postIncidentStatus }}
-              </nz-tag>
-              <pre>{{ incident.postIncidentSummary }}</pre>
-            </ng-template>
-          </section>
-
-          <section class="detail-section" *ngIf="incident.timeline.length">
-            <h3>Timeline</h3>
-            <div class="timeline-list">
-              <div class="timeline-row" *ngFor="let event of incident.timeline">
-                <div>
-                  <strong>{{ event.eventType }}</strong>
-                  <p>{{ event.message || '-' }}</p>
-                </div>
-                <span>{{ event.createdAt | date: 'short' }}</span>
-              </div>
-            </div>
-          </section>
-
-          <section class="detail-section" *ngIf="incident.approvalDecisions.length">
-            <h3>Approval audit</h3>
-            <div class="audit-list">
-              <div class="audit-row" *ngFor="let decision of incident.approvalDecisions">
-                <div>
-                  <strong>{{ decision.decision }}</strong>
-                  <span>{{ decision.actor || '-' }}</span>
-                </div>
-                <nz-tag [nzColor]="decision.outcome === 'SUCCEEDED' ? 'green' : 'red'">{{ decision.outcome }}</nz-tag>
-                <code>{{ decision.submittedPlanHash || '-' }}</code>
-                <span>{{ decision.createdAt | date: 'short' }}</span>
-              </div>
-            </div>
-          </section>
-
-          <section class="detail-section" *ngIf="incident.errorMessage">
-            <h3>Error</h3>
-            <pre class="error-block">{{ incident.errorMessage }}</pre>
-          </section>
-        </ng-container>
-      </nz-spin>
-    </ng-container>
-  </nz-drawer>
 </div>
