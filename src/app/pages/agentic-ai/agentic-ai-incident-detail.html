@@ -1,0 +1,205 @@
+<div class="agent-page detail-page">
+  <div class="detail-toolbar">
+    <a nz-button nzType="text" routerLink="/agentic-ai/incidents"><span nz-icon nzType="arrow-left" nzTheme="outline"></span> Back to incidents</a>
+    <div class="detail-toolbar-actions">
+      <span class="live-indicator" *ngIf="isAutoRefreshing"><i></i> Live updates every 5 seconds</span>
+      <button nz-button (click)="loadIncident(false)" [disabled]="isLoading || isRefreshing"><span nz-icon nzType="reload" nzTheme="outline"></span> Refresh</button>
+    </div>
+  </div>
+
+  <nz-spin [nzSpinning]="isLoading">
+    <ng-container *ngIf="incident as currentIncident">
+      <header class="incident-hero">
+        <div>
+          <span class="section-kicker">Incident {{ currentIncident.id }}</span>
+          <h2>{{ currentIncident.alarmName }}</h2>
+          <p>{{ currentIncident.triage?.summary || currentIncident.reason || 'The incident is waiting for an agent assessment.' }}</p>
+        </div>
+        <div class="hero-status">
+          <nz-tag [nzColor]="stateColor(currentIncident.state)" [attr.title]="currentIncident.state">{{ stateLabel(currentIncident.state) }}</nz-tag>
+          <nz-tag *ngIf="currentIncident.isPlanExpired" nzColor="red">Plan expired</nz-tag>
+        </div>
+      </header>
+
+      <section class="approval-banner" *ngIf="currentIncident.state === 'AWAITING_APPROVAL'">
+        <div class="approval-icon"><span nz-icon nzType="safety-certificate" nzTheme="outline"></span></div>
+        <div class="approval-copy">
+          <span class="section-kicker">Human decision required</span>
+          <h3>{{ operationLabel(currentIncident.plan.actions[0]?.operationId || 'Review the proposed plan') }}</h3>
+          <p>Run on <strong>{{ currentIncident.hostId }}</strong>: {{ currentIncident.plan.actions[0]?.reason || currentIncident.plan.rationale }}</p>
+          <small *ngIf="!canApprove">A user with the Manager or Admin role must make this decision.</small>
+        </div>
+        <div class="approval-actions" *ngIf="canDecideIncident(currentIncident)">
+          <button nz-button nzType="primary" [nzLoading]="decidingIncidentId === currentIncident.id" (click)="approveIncident(currentIncident)"><span nz-icon nzType="check-circle" nzTheme="outline"></span> Approve exact plan</button>
+          <button nz-button nzDanger [disabled]="!!decidingIncidentId" (click)="rejectIncident(currentIncident)">Reject</button>
+        </div>
+      </section>
+
+      <section class="incident-at-a-glance" aria-label="Incident at a glance">
+        <div><span>Host</span><strong>{{ currentIncident.hostId }}</strong></div>
+        <div><span>Priority</span><strong>{{ currentIncident.triage?.priority || 'Assessing' }}</strong></div>
+        <div><span>Last update</span><strong>{{ currentIncident.updatedAt | date: 'short' }}</strong></div>
+        <div class="next-action"><span>What happens next</span><strong>{{ nextAction(currentIncident) }}</strong></div>
+      </section>
+
+      <nav class="section-nav" aria-label="Incident detail sections">
+        <a href="#overview">Overview</a>
+        <a href="#activity">Agent activity</a>
+        <a href="#evidence">Evidence &amp; safety</a>
+        <a href="#timeline">Timeline &amp; audit</a>
+      </nav>
+
+      <section class="workspace-section" id="overview">
+        <div class="section-title"><div><span class="section-kicker">Operator summary</span><h2>What happened and what is proposed</h2></div><a nz-button nzSize="small" routerLink="/audit" [queryParams]="sshAuditParams(currentIncident)"><span nz-icon nzType="audit" nzTheme="outline"></span> Related SSH activity</a></div>
+        <div class="overview-grid">
+          <article class="content-card">
+            <span class="card-step">1</span>
+            <span class="section-kicker">AI assessment</span>
+            <h3>{{ currentIncident.triage?.summary || 'Assessment in progress' }}</h3>
+            <p>{{ currentIncident.triage?.rationale || currentIncident.reason || 'The reasoning agent has not returned a triage result yet.' }}</p>
+            <div class="chip-row" *ngIf="currentIncident.triage"><nz-tag>{{ currentIncident.triage.priority }} priority</nz-tag><nz-tag>{{ currentIncident.triage.category }}</nz-tag></div>
+          </article>
+          <article class="content-card">
+            <span class="card-step">2</span>
+            <span class="section-kicker">Reviewed plan</span>
+            <h3>{{ currentIncident.plan.summary || 'No remediation proposed' }}</h3>
+            <p>{{ currentIncident.plan.rationale || 'The evidence did not produce a mutating action.' }}</p>
+            <div class="proposed-operation" *ngFor="let action of currentIncident.plan.actions">
+              <strong>{{ operationLabel(action.operationId) }}</strong><code>{{ action.operationId }}</code><span>{{ action.reason }}</span>
+            </div>
+          </article>
+        </div>
+
+        <article class="content-card outcome-card" *ngIf="hasStructuredReport(currentIncident)">
+          <div class="card-heading"><div><span class="section-kicker">Verified outcome</span><h3>{{ currentIncident.postIncidentReport.finalState || stateLabel(currentIncident.state) }}</h3></div><nz-tag [nzColor]="stateColor(currentIncident.state)">{{ stateLabel(currentIncident.state) }}</nz-tag></div>
+          <div class="outcome-grid">
+            <div><span>Root cause</span><p>{{ currentIncident.postIncidentReport.rootCauseSummary || 'Not recorded' }}</p></div>
+            <div><span>Action taken</span><p>{{ currentIncident.postIncidentReport.actionTaken || 'No action executed' }}</p></div>
+            <div><span>Verification</span><p>{{ currentIncident.postIncidentReport.verificationSummary || 'Not recorded' }}</p></div>
+          </div>
+        </article>
+      </section>
+
+      <section class="workspace-section" id="activity">
+        <div class="section-title"><div><span class="section-kicker">Auditable decision flow</span><h2>Agent activity</h2><p>Click a stage to see who was responsible and what that stage means.</p></div><span class="trace-version">Trace {{ trace.schemaVersion }}</span></div>
+        <div class="actor-legend" aria-label="Decision actor legend"><span><i class="actor deterministic"></i>Deterministic workflow</span><span><i class="actor model"></i>AI reasoning</span><span><i class="actor tool"></i>Bounded tool</span><span><i class="actor human"></i>Human</span></div>
+
+        <ol class="decision-flow" aria-label="Incident workflow stages">
+          <li *ngFor="let stage of workflowStages; let index = index">
+            <button type="button" [class]="stage.state" [class.selected]="selectedStageId === stage.id" [attr.aria-pressed]="selectedStageId === stage.id" (click)="selectStage(stage)">
+              <span>{{ stage.state === 'complete' ? '✓' : index + 1 }}</span><strong>{{ stage.label }}</strong><small>{{ stage.state }}</small>
+            </button>
+          </li>
+        </ol>
+
+        <article class="selected-stage" *ngIf="selectedStage as stage">
+          <div><i class="actor" [class]="'actor ' + stage.actor"></i><span><small>Selected stage</small><strong>{{ stage.label }}</strong></span></div>
+          <p>{{ stage.summary }}</p>
+          <nz-tag [nzColor]="statusColor(stage.state)">{{ stage.state }}</nz-tag>
+        </article>
+
+        <div class="activity-grid">
+          <article class="content-card">
+            <div class="card-heading"><div><span class="section-kicker">Actual per-run handoffs</span><h3>Reasoning Agent calls</h3></div><span class="count-badge">{{ trace.agentActions.length }}</span></div>
+            <div class="empty-callout compact" *ngIf="!trace.agentActions.length"><strong>No per-run handoff trace is available.</strong><span>Older incidents still show the configured agent roles below.</span></div>
+            <ol class="agent-action-list" *ngIf="trace.agentActions.length">
+              <li *ngFor="let action of trace.agentActions">
+                <i class="actor" [class.model]="action.actorType === 'MODEL_ASSISTED'" [class.deterministic]="action.actorType === 'DETERMINISTIC'"></i>
+                <div><div class="event-heading"><strong>{{ action.stage | titlecase }}</strong><nz-tag [nzColor]="statusColor(action.status)">{{ action.status }}</nz-tag></div><p>{{ action.summary }}</p><small>{{ action.fromAgent }} → {{ action.toAgent }} · {{ action.protocol | uppercase }} · {{ formatDuration(action.durationMs) }}</small></div>
+              </li>
+            </ol>
+          </article>
+
+          <article class="content-card">
+            <div class="card-heading"><div><span class="section-kicker">Configured collaboration</span><h3>Agent handoff chain</h3></div><span class="count-badge">{{ currentIncident.explanation.agents.length }}</span></div>
+            <div class="agent-chain">
+              <details *ngFor="let agent of currentIncident.explanation.agents">
+                <summary><span><strong>{{ agent.name }}</strong><small>{{ agent.purpose }}</small></span><nz-tag [nzColor]="statusColor(actionForAgent(agent))">{{ actionForAgent(agent) }}</nz-tag></summary>
+                <div class="agent-detail-grid"><div><b>Reasoning</b><span>{{ agent.reasoningType }}</span></div><div><b>Memory</b><span>{{ agent.memory }}</span></div><div><b>Tools</b><span>{{ agent.tools.join(', ') || 'None' }}</span></div><div><b>Hands off to</b><span>{{ agent.handoffTo || 'Workflow closeout' }}</span></div></div>
+              </details>
+            </div>
+          </article>
+        </div>
+
+        <div class="tool-boundary-note"><span nz-icon nzType="safety-certificate" nzTheme="outline"></span><div><strong>No free-form commands</strong><p>Tools receive reviewed operation IDs and server-bound run context. Model output cannot grant runtime authority.</p></div></div>
+
+        <div class="tool-phase" *ngFor="let phase of toolPhases">
+          <div class="card-heading"><div><span class="section-kicker">{{ phase }} phase</span><h3>{{ phase === 'diagnose' ? 'Diagnostic' : (phase === 'remediate' ? 'Remediation' : 'Verification') }} tool calls</h3></div><span class="count-badge">{{ toolCallsForPhase(phase).length }}</span></div>
+          <div class="empty-callout compact" *ngIf="!toolCallsForPhase(phase).length"><span>No {{ phase }} tool calls have been recorded.</span></div>
+          <ol class="tool-call-list">
+            <li *ngFor="let call of toolCallsForPhase(phase); let index = index">
+              <span class="tool-sequence">{{ index + 1 }}</span>
+              <div class="tool-call-body">
+                <div class="event-heading"><div><strong>{{ operationLabel(call.operationId) }}</strong><code>{{ call.operationId }}</code></div><nz-tag [nzColor]="statusColor(call.status)">{{ call.status }}</nz-tag></div>
+                <p>{{ call.reason }}</p>
+                <div class="tool-metrics"><span><b>Selection</b>{{ selectionLabel(call.selectedBy) }}</span><span><b>Result</b>Exit {{ call.exitCode }}</span><span><b>Duration</b>{{ formatDuration(call.durationMs) }}</span></div>
+                <details><summary>Technical record</summary><div class="technical-record"><span>Result digest <code>{{ shortDigest(call.resultDigest) }}</code></span><span>Output {{ call.outputTruncated ? 'was truncated to the configured limit' : 'stayed within the configured limit' }}</span><span>{{ call.occurredAt | date: 'medium' }}</span></div></details>
+                <details *ngIf="diagnosticEvidence(call) as result"><summary>View bounded diagnostic output</summary><pre>{{ result.stdout }}{{ result.stderr }}</pre></details>
+              </div>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="workspace-section" id="evidence">
+        <div class="section-title"><div><span class="section-kicker">Authority and evidence</span><h2>Evidence &amp; safety controls</h2><p>Technical detail stays available without obscuring the incident story.</p></div></div>
+        <div class="safety-grid">
+          <article class="content-card">
+            <div class="card-heading"><div><h3>Deterministic guardrails</h3></div><span class="count-badge">{{ currentIncident.explanation.guardrails.length }}</span></div>
+            <div class="guardrail-list">
+              <div class="guardrail-row" *ngFor="let guardrail of currentIncident.explanation.guardrails"><nz-tag [nzColor]="guardrail.passed ? 'green' : 'red'">{{ guardrail.passed ? 'Passed' : 'Failed' }}</nz-tag><div><code>{{ guardrail.name }}</code><p>{{ guardrail.reason }}</p></div></div>
+            </div>
+          </article>
+          <article class="content-card responsibility-card">
+            <h3>Who has authority?</h3>
+            <dl><div><dt>AI model</dt><dd>{{ currentIncident.explanation.responsibility.modelAdvisory ? 'Advisory only' : 'No recorded boundary' }}</dd></div><div><dt>Human approval</dt><dd>{{ currentIncident.explanation.responsibility.humanApprovalRequired ? 'Required for mutation' : 'Not required' }}</dd></div><div><dt>Execution owner</dt><dd>{{ currentIncident.explanation.responsibility.executionOwner }}</dd></div><div><dt>Capability issuer</dt><dd>{{ currentIncident.explanation.responsibility.tokenIssuer }}</dd></div><div><dt>Terminal traffic</dt><dd>{{ currentIncident.explanation.responsibility.terminalTraffic }}</dd></div></dl>
+          </article>
+        </div>
+
+        <article class="content-card" *ngIf="currentIncident.evidence.length">
+          <div class="card-heading"><div><h3>Bounded diagnostic evidence</h3><p>Output is redacted and capped before storage.</p></div><span class="count-badge">{{ currentIncident.evidence.length }}</span></div>
+          <div class="evidence-list">
+            <details *ngFor="let result of currentIncident.evidence"><summary><span><strong>{{ operationLabel(result.operationId) }}</strong><code>{{ result.operationId }}</code></span><nz-tag [nzColor]="result.exitCode === 0 ? 'green' : 'red'">Exit {{ result.exitCode }}</nz-tag></summary><pre>{{ result.stdout }}{{ result.stderr }}</pre></details>
+          </div>
+        </article>
+
+        <details class="content-card technical-details">
+          <summary>Model, workflow, and approval identifiers</summary>
+          <nz-descriptions nzSize="small" [nzColumn]="2" nzBordered>
+            <nz-descriptions-item nzTitle="Planner">{{ currentIncident.explanation.model.plannerType || 'Not recorded' }}</nz-descriptions-item>
+            <nz-descriptions-item nzTitle="Provider">{{ currentIncident.explanation.model.provider || 'Not recorded' }}</nz-descriptions-item>
+            <nz-descriptions-item nzTitle="Model">{{ currentIncident.explanation.model.modelId || 'Not recorded' }}</nz-descriptions-item>
+            <nz-descriptions-item nzTitle="Region">{{ currentIncident.explanation.model.awsRegion || 'Not recorded' }}</nz-descriptions-item>
+            <nz-descriptions-item nzTitle="Gateway route">{{ currentIncident.explanation.model.gatewayRoute || 'Not exposed' }}</nz-descriptions-item>
+            <nz-descriptions-item nzTitle="Operation catalog">{{ currentIncident.explanation.workflow.catalogVersion || 'Not recorded' }}</nz-descriptions-item>
+            <nz-descriptions-item nzTitle="Run ID">{{ currentIncident.explanation.workflow.runId || 'Not recorded' }}</nz-descriptions-item>
+            <nz-descriptions-item nzTitle="Plan hash"><code>{{ currentIncident.planHash || 'Not applicable' }}</code></nz-descriptions-item>
+            <nz-descriptions-item nzTitle="Plan expiry">{{ currentIncident.planExpiresAt ? (currentIncident.planExpiresAt | date: 'medium') : 'Not applicable' }}</nz-descriptions-item>
+            <nz-descriptions-item nzTitle="Approver">{{ currentIncident.approverSubject || 'No decision yet' }}</nz-descriptions-item>
+          </nz-descriptions>
+        </details>
+      </section>
+
+      <section class="workspace-section" id="timeline">
+        <div class="section-title"><div><span class="section-kicker">Audit trail</span><h2>Timeline &amp; approval audit</h2></div></div>
+        <div class="activity-grid">
+          <article class="content-card">
+            <div class="card-heading"><h3>Incident timeline</h3><span class="count-badge">{{ currentIncident.timeline.length }}</span></div>
+            <div class="timeline-list">
+              <div class="timeline-row" *ngFor="let event of currentIncident.timeline"><div><strong>{{ eventLabel(event.eventType) }}</strong><p>{{ event.message || 'Recorded workflow event' }}</p></div><span>{{ event.createdAt | date: 'short' }}</span></div>
+            </div>
+          </article>
+          <article class="content-card">
+            <div class="card-heading"><h3>Human decisions</h3><span class="count-badge">{{ currentIncident.approvalDecisions.length }}</span></div>
+            <div class="empty-callout compact" *ngIf="!currentIncident.approvalDecisions.length"><span>No approval or rejection has been submitted.</span></div>
+            <div class="audit-list">
+              <div class="audit-row" *ngFor="let decision of currentIncident.approvalDecisions"><div><strong>{{ decision.decision }}</strong><span>{{ decision.actor || 'Unknown actor' }}</span></div><nz-tag [nzColor]="decision.outcome === 'SUCCEEDED' ? 'green' : 'red'">{{ decision.outcome }}</nz-tag><span>{{ decision.createdAt | date: 'short' }}</span><small *ngIf="decision.errorReason">{{ decision.errorReason }}</small></div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="content-card error-block" *ngIf="currentIncident.errorMessage"><strong>Workflow stopped safely</strong><p>{{ currentIncident.errorMessage }}</p></section>
+    </ng-container>
+  </nz-spin>
+</div>

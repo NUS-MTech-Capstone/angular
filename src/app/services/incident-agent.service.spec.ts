@@ -234,11 +234,32 @@ describe('IncidentAgentService', () => {
     const req = http.expectOne('/incidents/inc-1');
     expect(req.request.method).toBe('GET');
     expect(req.request.headers.get('Accept')).toBe('application/json');
-    req.flush(incidentDetail());
+    const detail = incidentDetail();
+    detail.explanation.trace = {
+      schemaVersion: 'v1',
+      agentActions: [],
+      toolCalls: [
+        {
+          eventId: 'event-1',
+          operationId: 'target_probe',
+          phase: 'diagnose',
+          selectedBy: 'policy',
+          status: 'SUCCEEDED',
+          reason: 'baseline diagnostic',
+          durationMs: 42,
+          exitCode: 0,
+          resultDigest: 'sha256:result',
+          outputTruncated: false,
+          occurredAt: '2026-01-01T00:02:00Z',
+        },
+      ],
+    };
+    req.flush(detail);
 
     expect(result?.plan.actions[0].operationId).toBe('restart_service');
     expect(result?.explanation.agents[0].name).toBe('Evidence Collector Agent');
     expect(result?.explanation.toolDecisions[0].operationId).toBe('target_probe');
+    expect(result?.explanation.trace?.toolCalls[0].resultDigest).toBe('sha256:result');
   });
 
   it('normalizes nullable incident detail lists from the live API', () => {
@@ -258,6 +279,7 @@ describe('IncidentAgentService', () => {
         agents: null,
         toolDecisions: null,
         guardrails: null,
+        trace: null,
       },
     });
 
@@ -266,6 +288,11 @@ describe('IncidentAgentService', () => {
     expect(result?.explanation.agents).toEqual([]);
     expect(result?.explanation.toolDecisions).toEqual([]);
     expect(result?.explanation.guardrails).toEqual([]);
+    expect(result?.explanation.trace).toEqual({
+      schemaVersion: 'v1',
+      agentActions: [],
+      toolCalls: [],
+    });
     expect(result?.timeline).toEqual([]);
     expect(result?.approvalDecisions).toEqual([]);
   });

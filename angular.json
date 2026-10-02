@@ -29,7 +29,11 @@
                 "output": "/assets/"
               }
             ],
-            "styles": ["src/theme.less", "src/styles.css"]
+            "styles": [
+              "src/theme.less",
+              "src/styles.css",
+              "src/app/pages/agentic-ai/agentic-ai.css"
+            ]
           },
           "configurations": {
             "production": {

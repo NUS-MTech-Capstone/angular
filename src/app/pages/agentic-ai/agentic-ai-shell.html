@@ -1,0 +1,20 @@
+<div class="agent-shell">
+  <header class="shell-header">
+    <div>
+      <span class="shell-kicker">Human-approved incident automation</span>
+      <h1><span nz-icon nzType="robot" nzTheme="outline"></span> AI Incident Operations</h1>
+      <p>See what the agents assessed, which bounded tools ran, and what still needs a human decision.</p>
+    </div>
+  </header>
+
+  <nav class="shell-tabs" aria-label="Agentic AI sections">
+    <a routerLink="/agentic-ai/incidents" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: false }">
+      Incidents
+    </a>
+    <a routerLink="/agentic-ai/alerts" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: false }">
+      Alerts
+    </a>
+  </nav>
+
+  <router-outlet></router-outlet>
+</div>

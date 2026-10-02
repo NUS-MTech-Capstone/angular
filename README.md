@@ -44,6 +44,39 @@ The production environment therefore uses an empty API base URL. Development
 continues to use the local JWT flow against `http://localhost:3000`; local SSH
 gateway calls use `environment.gatewayUrl`.
 
+## Agentic AI Workspace
+
+Agentic AI uses a single, persistent tabbed workspace. Incidents are the
+default operator view and Alerts provide supporting monitoring context:
+
+```text
+/agentic-ai                         -> /agentic-ai/incidents
+/agentic-ai/incidents               incident list
+/agentic-ai/incidents/:incidentId   full incident workspace
+/agentic-ai/alerts                  alert list
+/agentic-ai/alerts/:alertId         concise alert context
+```
+
+Legacy `/agentic-ai?incidentId=...` links redirect to the dedicated incident
+route. The previous incident and alert drawers have been removed so details are
+deep-linkable and the current outcome, workflow step, and required human action
+remain visible at presentation resolution.
+
+Incident detail presents Overview, Agent activity, Evidence and safety, and
+Timeline and audit sections. The activity view distinguishes deterministic,
+model-assisted, bounded-tool, and human actors; overlays the actual A2A
+handoffs; and numbers tool calls by diagnose, remediate, and verify phase.
+Readable operation labels are shown alongside operation IDs. Diagnostic output,
+model/catalog/gateway identity, hashes, and responsibility detail are collapsed
+by default. The page displays stored safe summaries only and never requests or
+renders chain-of-thought, prompts, tokens, command bodies, secrets, or terminal
+traffic.
+
+`DIAGNOSING` and `EXECUTING` incident details refresh every five seconds. The
+poll stops on terminal states and component destruction, and approval/rejection
+refreshes immediately. Manager/Admin role checks and exact stored plan-hash
+submission are unchanged.
+
 ## Development
 
 ```bash

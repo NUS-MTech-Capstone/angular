@@ -1,0 +1,48 @@
+<div class="agent-page detail-page">
+  <div class="detail-toolbar">
+    <a nz-button nzType="text" routerLink="/agentic-ai/alerts"><span nz-icon nzType="arrow-left" nzTheme="outline"></span> Back to alerts</a>
+    <button nz-button (click)="loadAlert()" [disabled]="isLoading"><span nz-icon nzType="reload" nzTheme="outline"></span> Refresh</button>
+  </div>
+
+  <nz-spin [nzSpinning]="isLoading">
+    <ng-container *ngIf="alert as currentAlert">
+      <header class="incident-hero compact-hero">
+        <div>
+          <span class="section-kicker">Monitoring signal</span>
+          <h2>{{ currentAlert.alarmName }}</h2>
+          <p>{{ currentAlert.reason || 'No additional alarm context was supplied.' }}</p>
+        </div>
+        <div class="hero-status">
+          <nz-tag [nzColor]="cloudwatchColor(currentAlert.cloudwatchState)">{{ currentAlert.cloudwatchState === 'ALARM' ? 'Alarm active' : 'Healthy' }}</nz-tag>
+          <nz-tag [nzColor]="statusColor(currentAlert.status)" [attr.title]="currentAlert.status">{{ statusLabel(currentAlert.status) }}</nz-tag>
+        </div>
+      </header>
+
+      <section class="content-card related-incident-card" *ngIf="currentAlert.incidentId; else noIncident">
+        <div>
+          <span class="section-kicker">Related AI workflow</span>
+          <h3>{{ currentAlert.incident?.triage?.summary || 'An incident workflow was created for this alert.' }}</h3>
+          <p>Open the incident to review agent handoffs, bounded tool calls, approval, and verification.</p>
+        </div>
+        <a nz-button nzType="primary" [routerLink]="['/agentic-ai/incidents', currentAlert.incidentId]">Review incident <span nz-icon nzType="right" nzTheme="outline"></span></a>
+      </section>
+      <ng-template #noIncident>
+        <section class="content-card empty-callout"><strong>No incident is linked yet.</strong><span>The alert may still be waiting for triage or may not require an incident.</span></section>
+      </ng-template>
+
+      <section class="content-card">
+        <div class="card-heading"><div><span class="section-kicker">Alert context</span><h3>Signal details</h3></div><a nz-button nzSize="small" routerLink="/audit" [queryParams]="sshAuditParams(currentAlert)"><span nz-icon nzType="audit" nzTheme="outline"></span> Related SSH activity</a></div>
+        <nz-descriptions nzSize="small" [nzColumn]="2" nzBordered>
+          <nz-descriptions-item nzTitle="Host">{{ currentAlert.hostId }}</nz-descriptions-item>
+          <nz-descriptions-item nzTitle="Source">{{ currentAlert.sourceType }}</nz-descriptions-item>
+          <nz-descriptions-item nzTitle="Occurred">{{ currentAlert.occurredAt | date: 'medium' }}</nz-descriptions-item>
+          <nz-descriptions-item nzTitle="Grouped">{{ currentAlert.grouped ? 'Yes — joined an active incident' : 'No' }}</nz-descriptions-item>
+          <nz-descriptions-item nzTitle="Alert ID">{{ currentAlert.id }}</nz-descriptions-item>
+          <nz-descriptions-item nzTitle="Group key">{{ currentAlert.groupKey || 'Not supplied' }}</nz-descriptions-item>
+        </nz-descriptions>
+      </section>
+
+      <section class="content-card error-block" *ngIf="currentAlert.errorSummary"><strong>Processing issue</strong><p>{{ currentAlert.errorSummary }}</p></section>
+    </ng-container>
+  </nz-spin>
+</div>
