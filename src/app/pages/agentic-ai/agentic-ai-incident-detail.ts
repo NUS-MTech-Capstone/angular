@@ -34,8 +34,26 @@ interface WorkflowStage {
   summary: string;
 }
 
+interface StageFact {
+  label: string;
+  value: string;
+}
+
 const EMPTY_TRACE: ExplanationTrace = { schemaVersion: 'v1', agentActions: [], toolCalls: [] };
 const ACTIVE_STATES: IncidentState[] = ['DIAGNOSING', 'EXECUTING'];
+const STAGE_AGENT_NAMES: Record<string, string[]> = {
+  alert: ['Incident Manager Agent'],
+  triage: ['Triage Agent'],
+  diagnose: ['Evidence Collector Agent'],
+  plan: ['Action Plan Agent'],
+  approval: ['Action Plan Reviewer Agent'],
+  remediate: ['Remediation Executor Agent'],
+  verify: ['Remediation Executor Agent'],
+  closed: ['Incident Manager Agent'],
+};
+const HIDDEN_TOOL_REASONS = new Set([
+  'Default bounded diagnostic operation from the v1 catalog.',
+]);
 const OPERATION_LABELS: Record<string, string> = {
   system_overview: 'Inspect system overview',
   disk_usage: 'Check disk usage',
@@ -132,6 +150,94 @@ export class AgenticAiIncidentDetail implements OnInit, OnDestroy {
 
   get selectedStage(): WorkflowStage | undefined {
     return this.workflowStages.find((stage) => stage.id === this.selectedStageId) ?? this.workflowStages[0];
+  }
+
+  get selectedAgents(): ExplanationAgent[] {
+    const names = STAGE_AGENT_NAMES[this.selectedStage?.id ?? ''] ?? [];
+    return this.incident?.explanation.agents.filter((agent) => names.includes(agent.name)) ?? [];
+  }
+
+  get selectedAgentActions(): ExplanationTrace['agentActions'] {
+    const stageId = this.selectedStage?.id;
+    if (!stageId) return [];
+    return this.trace.agentActions.filter((action) => action.stage.toLowerCase() === stageId);
+  }
+
+  get selectedToolCalls(): ExplanationToolCall[] {
+    const stageId = this.selectedStage?.id;
+    if (stageId !== 'diagnose' && stageId !== 'remediate' && stageId !== 'verify') return [];
+    return this.toolCallsForPhase(stageId);
+  }
+
+  get selectedStageFacts(): StageFact[] {
+    const incident = this.incident;
+    const stageId = this.selectedStage?.id;
+    if (!incident || !stageId) return [];
+
+    switch (stageId) {
+      case 'alert':
+        return [
+          { label: 'Host', value: incident.hostId },
+          { label: 'Source record', value: incident.sourceId || 'Not recorded' },
+          { label: 'Created', value: this.formatTimestamp(incident.createdAt) },
+        ];
+      case 'triage':
+        return [
+          { label: 'Priority', value: incident.triage ? this.humanize(incident.triage.priority) : 'Assessing' },
+          { label: 'Category', value: incident.triage?.category || 'Not assigned' },
+          { label: 'Assessment', value: incident.triage ? 'Complete' : 'In progress' },
+        ];
+      case 'diagnose': {
+        const calls = this.toolCallsForPhase('diagnose');
+        return [
+          { label: 'Tool attempts', value: `${calls.length}` },
+          { label: 'Successful', value: `${calls.filter((call) => call.status === 'SUCCEEDED').length}` },
+          { label: 'Evidence records', value: `${incident.evidence.length}` },
+        ];
+      }
+      case 'plan':
+        return [
+          { label: 'Proposed operations', value: `${incident.plan.actions.length}` },
+          {
+            label: 'Safety checks',
+            value: incident.explanation.guardrails.length
+              ? `${incident.explanation.guardrails.filter((guardrail) => guardrail.passed).length}/${incident.explanation.guardrails.length} passed`
+              : 'Not recorded',
+          },
+          { label: 'Plan state', value: incident.plan.summary ? 'Ready for review' : 'In progress' },
+        ];
+      case 'approval':
+        return [
+          { label: 'Required role', value: 'Manager or Admin' },
+          { label: 'Decision', value: incident.approvalDecision ? this.humanize(incident.approvalDecision) : 'Awaiting decision' },
+          { label: 'Approver', value: incident.approverSubject || 'Not decided' },
+          { label: 'Operation', value: this.operationLabel(incident.plan.actions[0]?.operationId || 'No operation proposed') },
+        ];
+      case 'remediate': {
+        const calls = this.toolCallsForPhase('remediate');
+        return [
+          { label: 'Approved operation', value: this.operationLabel(incident.plan.actions[0]?.operationId || 'No operation proposed') },
+          { label: 'Execution attempts', value: `${calls.length}` },
+          { label: 'Result', value: calls.length ? this.humanize(calls[calls.length - 1].status) : 'Not started' },
+        ];
+      }
+      case 'verify': {
+        const calls = this.toolCallsForPhase('verify');
+        return [
+          { label: 'Verification checks', value: `${calls.length}` },
+          { label: 'Successful', value: `${calls.filter((call) => call.status === 'SUCCEEDED').length}` },
+          { label: 'Outcome', value: incident.postIncidentReport.verificationSummary || (calls.length ? 'Checks recorded' : 'Not started') },
+        ];
+      }
+      case 'closed':
+        return [
+          { label: 'Final state', value: incident.postIncidentReport.finalState || this.stateLabel(incident.state) },
+          { label: 'Duration', value: this.formatSeconds(incident.postIncidentReport.durationSeconds) },
+          { label: 'Resolved', value: incident.postIncidentReport.resolvedAt ? this.formatTimestamp(incident.postIncidentReport.resolvedAt) : 'Not recorded' },
+        ];
+      default:
+        return [];
+    }
   }
 
   get isAutoRefreshing(): boolean {
@@ -231,6 +337,11 @@ export class AgenticAiIncidentDetail implements OnInit, OnDestroy {
     return call.phase === 'diagnose' ? this.evidenceForOperation(call.operationId) : undefined;
   }
 
+  visibleToolReason(call: ExplanationToolCall): string {
+    const reason = call.reason.trim();
+    return HIDDEN_TOOL_REASONS.has(reason) ? '' : reason;
+  }
+
   actionForAgent(agent: ExplanationAgent): string {
     const action = this.trace.agentActions.find((item) =>
       item.toAgent && (
@@ -239,7 +350,7 @@ export class AgenticAiIncidentDetail implements OnInit, OnDestroy {
         || item.toAgent.includes(agent.name)
       ),
     );
-    return action?.status ?? 'DEFINED';
+    return action?.status ?? this.selectedStage?.state ?? 'DEFINED';
   }
 
   statusColor(status: string): string {
@@ -349,5 +460,23 @@ export class AgenticAiIncidentDetail implements OnInit, OnDestroy {
     const date = new Date(value);
     const base = Number.isNaN(date.getTime()) ? Date.now() : date.getTime();
     return new Date(base + offsetMinutes * 60 * 1000).toISOString();
+  }
+
+  private humanize(value: string): string {
+    const normalized = value.toLowerCase().replaceAll('_', ' ');
+    return normalized.replace(/^./, (character) => character.toUpperCase());
+  }
+
+  private formatTimestamp(value: string): string {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? 'Not recorded' : date.toLocaleString();
+  }
+
+  private formatSeconds(value?: number | null): string {
+    if (value === undefined || value === null) return 'Not recorded';
+    if (value < 60) return `${value} seconds`;
+    const minutes = Math.floor(value / 60);
+    const seconds = value % 60;
+    return seconds ? `${minutes} min ${seconds} sec` : `${minutes} min`;
   }
 }
