@@ -81,7 +81,7 @@
       </section>
 
       <section class="workspace-section" id="activity">
-        <div class="section-title"><div><span class="section-kicker">Auditable decision flow</span><h2>Agent activity</h2><p>Click a stage to see who was responsible and what that stage means.</p></div><span class="trace-version">Trace {{ trace.schemaVersion }}</span></div>
+        <div class="section-title"><div><span class="section-kicker">Auditable decision flow</span><h2>Agent activity</h2></div><span class="trace-version">Trace {{ trace.schemaVersion }}</span></div>
         <div class="actor-legend" aria-label="Decision actor legend"><span><i class="actor deterministic"></i>Deterministic workflow</span><span><i class="actor model"></i>AI reasoning</span><span><i class="actor tool"></i>Bounded tool</span><span><i class="actor human"></i>Human</span></div>
 
         <ol class="decision-flow" aria-label="Incident workflow stages">
@@ -93,35 +93,62 @@
         </ol>
 
         <article class="selected-stage" *ngIf="selectedStage as stage">
-          <div><i class="actor" [class]="'actor ' + stage.actor"></i><span><small>Selected stage</small><strong>{{ stage.label }}</strong></span></div>
-          <p>{{ stage.summary }}</p>
-          <nz-tag [nzColor]="statusColor(stage.state)">{{ stage.state }}</nz-tag>
+          <header class="selected-stage-header">
+            <div class="stage-identity"><i class="actor" [class]="'actor ' + stage.actor"></i><span><small>Selected stage</small><strong>{{ stage.label }}</strong></span></div>
+            <nz-tag [nzColor]="statusColor(stage.state)">{{ stage.state }}</nz-tag>
+          </header>
+
+          <p class="selected-stage-summary">{{ stage.summary }}</p>
+
+          <div class="stage-facts" *ngIf="selectedStageFacts.length">
+            <div *ngFor="let fact of selectedStageFacts"><span>{{ fact.label }}</span><strong>{{ fact.value }}</strong></div>
+          </div>
+
+          <section class="stage-contributors" *ngIf="selectedAgents.length">
+            <span class="section-kicker">Workflow contributors</span>
+            <div class="stage-agent-list">
+              <div class="stage-agent" *ngFor="let agent of selectedAgents">
+                <div class="stage-agent-heading"><strong>{{ agent.name }}</strong><nz-tag [nzColor]="statusColor(actionForAgent(agent))">{{ actionForAgent(agent) }}</nz-tag></div>
+                <ul><li *ngFor="let responsibility of agent.responsibilities">{{ responsibility }}</li></ul>
+                <div class="stage-agent-facts">
+                  <div><b>Reasoning</b><span>{{ agent.reasoningType }}</span></div>
+                  <div><b>Memory</b><span>{{ agent.memory }}</span></div>
+                  <div><b>Tools</b><span>{{ agent.tools.join(', ') || 'None' }}</span></div>
+                  <div><b>Receives</b><span>{{ agent.inputs.join(', ') || 'None' }}</span></div>
+                  <div><b>Produces</b><span>{{ agent.outputs.join(', ') || 'None' }}</span></div>
+                  <div><b>Hands off to</b><span>{{ agent.handoffTo || 'Workflow closeout' }}</span></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="stage-run-activity" *ngIf="selectedAgentActions.length || selectedToolCalls.length">
+            <span class="section-kicker">This run</span>
+            <div class="stage-run-list">
+              <div class="stage-run-row" *ngFor="let action of selectedAgentActions">
+                <i class="actor" [class.model]="action.actorType === 'MODEL_ASSISTED'" [class.deterministic]="action.actorType === 'DETERMINISTIC'"></i>
+                <div><strong>{{ action.fromAgent }} → {{ action.toAgent }}</strong><span>{{ action.summary }}</span><small>{{ action.protocol | uppercase }} · {{ formatDuration(action.durationMs) }}</small></div>
+                <nz-tag [nzColor]="statusColor(action.status)">{{ action.status }}</nz-tag>
+              </div>
+              <div class="stage-run-row" *ngFor="let call of selectedToolCalls">
+                <i class="actor tool"></i>
+                <div><strong>{{ operationLabel(call.operationId) }}</strong><code>{{ call.operationId }}</code><small>{{ formatDuration(call.durationMs) }} · Exit {{ call.exitCode }}</small></div>
+                <nz-tag [nzColor]="statusColor(call.status)">{{ call.status }}</nz-tag>
+              </div>
+            </div>
+          </section>
         </article>
 
-        <div class="activity-grid">
-          <article class="content-card">
-            <div class="card-heading"><div><span class="section-kicker">Actual per-run handoffs</span><h3>Reasoning Agent calls</h3></div><span class="count-badge">{{ trace.agentActions.length }}</span></div>
-            <div class="empty-callout compact" *ngIf="!trace.agentActions.length"><strong>No per-run handoff trace is available.</strong><span>Older incidents still show the configured agent roles below.</span></div>
-            <ol class="agent-action-list" *ngIf="trace.agentActions.length">
-              <li *ngFor="let action of trace.agentActions">
-                <i class="actor" [class.model]="action.actorType === 'MODEL_ASSISTED'" [class.deterministic]="action.actorType === 'DETERMINISTIC'"></i>
-                <div><div class="event-heading"><strong>{{ action.stage | titlecase }}</strong><nz-tag [nzColor]="statusColor(action.status)">{{ action.status }}</nz-tag></div><p>{{ action.summary }}</p><small>{{ action.fromAgent }} → {{ action.toAgent }} · {{ action.protocol | uppercase }} · {{ formatDuration(action.durationMs) }}</small></div>
-              </li>
-            </ol>
-          </article>
-
-          <article class="content-card">
-            <div class="card-heading"><div><span class="section-kicker">Configured collaboration</span><h3>Agent handoff chain</h3></div><span class="count-badge">{{ currentIncident.explanation.agents.length }}</span></div>
-            <div class="agent-chain">
-              <details *ngFor="let agent of currentIncident.explanation.agents">
-                <summary><span><strong>{{ agent.name }}</strong><small>{{ agent.purpose }}</small></span><nz-tag [nzColor]="statusColor(actionForAgent(agent))">{{ actionForAgent(agent) }}</nz-tag></summary>
-                <div class="agent-detail-grid"><div><b>Reasoning</b><span>{{ agent.reasoningType }}</span></div><div><b>Memory</b><span>{{ agent.memory }}</span></div><div><b>Tools</b><span>{{ agent.tools.join(', ') || 'None' }}</span></div><div><b>Hands off to</b><span>{{ agent.handoffTo || 'Workflow closeout' }}</span></div></div>
-              </details>
-            </div>
-          </article>
-        </div>
-
-        <div class="tool-boundary-note"><span nz-icon nzType="safety-certificate" nzTheme="outline"></span><div><strong>No free-form commands</strong><p>Tools receive reviewed operation IDs and server-bound run context. Model output cannot grant runtime authority.</p></div></div>
+        <article class="content-card handoff-trace-card">
+          <div class="card-heading"><div><span class="section-kicker">Actual per-run handoffs</span><h3>Reasoning Agent calls</h3></div><span class="count-badge">{{ trace.agentActions.length }}</span></div>
+          <div class="empty-callout compact" *ngIf="!trace.agentActions.length"><strong>No per-run handoff trace is available.</strong></div>
+          <ol class="agent-action-list" *ngIf="trace.agentActions.length">
+            <li *ngFor="let action of trace.agentActions">
+              <i class="actor" [class.model]="action.actorType === 'MODEL_ASSISTED'" [class.deterministic]="action.actorType === 'DETERMINISTIC'"></i>
+              <div><div class="event-heading"><strong>{{ action.stage | titlecase }}</strong><nz-tag [nzColor]="statusColor(action.status)">{{ action.status }}</nz-tag></div><p>{{ action.summary }}</p><small>{{ action.fromAgent }} → {{ action.toAgent }} · {{ action.protocol | uppercase }} · {{ formatDuration(action.durationMs) }}</small></div>
+            </li>
+          </ol>
+        </article>
 
         <div class="tool-phase" *ngFor="let phase of toolPhases">
           <div class="card-heading"><div><span class="section-kicker">{{ phase }} phase</span><h3>{{ phase === 'diagnose' ? 'Diagnostic' : (phase === 'remediate' ? 'Remediation' : 'Verification') }} tool calls</h3></div><span class="count-badge">{{ toolCallsForPhase(phase).length }}</span></div>
@@ -131,7 +158,7 @@
               <span class="tool-sequence">{{ index + 1 }}</span>
               <div class="tool-call-body">
                 <div class="event-heading"><div><strong>{{ operationLabel(call.operationId) }}</strong><code>{{ call.operationId }}</code></div><nz-tag [nzColor]="statusColor(call.status)">{{ call.status }}</nz-tag></div>
-                <p>{{ call.reason }}</p>
+                <p *ngIf="visibleToolReason(call) as reason">{{ reason }}</p>
                 <div class="tool-metrics"><span><b>Selection</b>{{ selectionLabel(call.selectedBy) }}</span><span><b>Result</b>Exit {{ call.exitCode }}</span><span><b>Duration</b>{{ formatDuration(call.durationMs) }}</span></div>
                 <details><summary>Technical record</summary><div class="technical-record"><span>Result digest <code>{{ shortDigest(call.resultDigest) }}</code></span><span>Output {{ call.outputTruncated ? 'was truncated to the configured limit' : 'stayed within the configured limit' }}</span><span>{{ call.occurredAt | date: 'medium' }}</span></div></details>
                 <details *ngIf="diagnosticEvidence(call) as result"><summary>View bounded diagnostic output</summary><pre>{{ result.stdout }}{{ result.stderr }}</pre></details>
@@ -157,7 +184,7 @@
         </div>
 
         <article class="content-card" *ngIf="currentIncident.evidence.length">
-          <div class="card-heading"><div><h3>Bounded diagnostic evidence</h3><p>Output is redacted and capped before storage.</p></div><span class="count-badge">{{ currentIncident.evidence.length }}</span></div>
+          <div class="card-heading"><div><h3>Bounded diagnostic evidence</h3></div><span class="count-badge">{{ currentIncident.evidence.length }}</span></div>
           <div class="evidence-list">
             <details *ngFor="let result of currentIncident.evidence"><summary><span><strong>{{ operationLabel(result.operationId) }}</strong><code>{{ result.operationId }}</code></span><nz-tag [nzColor]="result.exitCode === 0 ? 'green' : 'red'">Exit {{ result.exitCode }}</nz-tag></summary><pre>{{ result.stdout }}{{ result.stderr }}</pre></details>
           </div>

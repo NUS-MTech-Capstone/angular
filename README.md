@@ -64,8 +64,11 @@ remain visible at presentation resolution.
 
 Incident detail presents Overview, Agent activity, Evidence and safety, and
 Timeline and audit sections. The activity view distinguishes deterministic,
-model-assisted, bounded-tool, and human actors; overlays the actual A2A
-handoffs; and numbers tool calls by diagnose, remediate, and verify phase.
+model-assisted, bounded-tool, and human actors. Selecting a workflow stage
+shows its configured contributors, responsibilities, reasoning and memory
+boundaries, inputs, outputs, next handoff, and matching per-run activity. The
+complete A2A trace remains visible below, and tool calls are numbered by
+diagnose, remediate, and verify phase.
 Readable operation labels are shown alongside operation IDs. Diagnostic output,
 model/catalog/gateway identity, hashes, and responsibility detail are collapsed
 by default. The page displays stored safe summaries only and never requests or

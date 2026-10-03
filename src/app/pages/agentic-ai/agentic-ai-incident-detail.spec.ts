@@ -7,9 +7,30 @@ import { NzModalService } from 'ng-zorro-antd/modal';
 import { of, throwError } from 'rxjs';
 import { icons } from '../../icons-provider';
 import { AuthService } from '../../services/auth.service';
-import { IncidentAgentService } from '../../services/incident-agent.service';
+import { ExplanationAgent, IncidentAgentService } from '../../services/incident-agent.service';
 import { AgenticAiIncidentDetail } from './agentic-ai-incident-detail';
 import { incidentFixture } from './agentic-ai.test-fixtures';
+
+const configuredAgent = (name: string, purpose: string): ExplanationAgent => ({
+  name,
+  purpose,
+  responsibilities: [`Handle the ${name.toLowerCase()} stage safely.`],
+  reasoningType: `${name} reasoning`,
+  memory: `${name} incident-local memory`,
+  tools: [`${name} tool`],
+  inputs: [`${name} input`],
+  outputs: [`${name} output`],
+  handoffTo: `${name} next participant`,
+});
+
+const configuredAgents = (): ExplanationAgent[] => [
+  configuredAgent('Incident Manager Agent', 'Coordinate the bounded incident workflow and preserve handoff order.'),
+  configuredAgent('Triage Agent', 'Classify the incident and produce an operator-readable triage summary.'),
+  configuredAgent('Evidence Collector Agent', 'Collect bounded diagnostic evidence from approved operation IDs.'),
+  configuredAgent('Action Plan Agent', 'Propose a structured remediation plan from triage and bounded evidence.'),
+  configuredAgent('Action Plan Reviewer Agent', 'Validate the proposed plan before it can be stored or approved.'),
+  configuredAgent('Remediation Executor Agent', 'Execute approved remediation and fixed verification after human approval.'),
+];
 
 describe('AgenticAiIncidentDetail', () => {
   let component: AgenticAiIncidentDetail;
@@ -23,6 +44,21 @@ describe('AgenticAiIncidentDetail', () => {
   let auth: { hasRole: ReturnType<typeof vi.fn> };
   let message: { success: ReturnType<typeof vi.fn>; error: ReturnType<typeof vi.fn> };
   let modal: { confirm: ReturnType<typeof vi.fn> };
+
+  const recreateWithIncident = (incident: ReturnType<typeof incidentFixture>): void => {
+    fixture.destroy();
+    incidentAgent.get.mockReturnValue(of(incident));
+    fixture = TestBed.createComponent(AgenticAiIncidentDetail);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  };
+
+  const clickStage = (label: string): void => {
+    const button = Array.from(fixture.nativeElement.querySelectorAll('.decision-flow button'))
+      .find((element: unknown) => (element as HTMLButtonElement).textContent?.includes(label)) as HTMLButtonElement;
+    button.click();
+    fixture.detectChanges();
+  };
 
   beforeEach(async () => {
     fixtureDestroyed = false;
@@ -78,9 +114,72 @@ describe('AgenticAiIncidentDetail', () => {
 
     const text = fixture.nativeElement.textContent;
     expect(text).toContain('Human decision required');
-    expect(text).toContain('No free-form commands');
+    expect(text).not.toContain('No free-form commands');
     expect(text).toContain('Diagnostic tool calls');
     expect(text).toContain('Selected by deterministic policy');
+  });
+
+  it('moves configured collaboration into a stage-specific inspector', () => {
+    const incident = incidentFixture();
+    incident.explanation.agents = configuredAgents();
+    recreateWithIncident(incident);
+
+    const expectedAgents: Record<string, string> = {
+      alert: 'Incident Manager Agent',
+      triage: 'Triage Agent',
+      diagnose: 'Evidence Collector Agent',
+      plan: 'Action Plan Agent',
+      approval: 'Action Plan Reviewer Agent',
+      remediate: 'Remediation Executor Agent',
+      verify: 'Remediation Executor Agent',
+      closed: 'Incident Manager Agent',
+    };
+    for (const stage of component.workflowStages) {
+      clickStage(stage.label);
+      expect(component.selectedAgents.map((agent) => agent.name)).toEqual([expectedAgents[stage.id]]);
+    }
+
+    clickStage('Triage');
+
+    expect(component.selectedAgents.map((agent) => agent.name)).toEqual(['Triage Agent']);
+    expect(component.selectedAgentActions).toHaveLength(1);
+    expect(fixture.nativeElement.textContent).toContain('Handle the triage agent stage safely.');
+    expect(fixture.nativeElement.textContent).toContain('Triage Agent reasoning');
+    expect(fixture.nativeElement.textContent).toContain('Triage Agent input');
+
+    clickStage('Diagnose');
+
+    expect(component.selectedAgents.map((agent) => agent.name)).toEqual(['Evidence Collector Agent']);
+    expect(component.selectedToolCalls.map((call) => call.operationId)).toEqual(['target_probe']);
+    expect(fixture.nativeElement.textContent).toContain('Probe target connectivity');
+
+    clickStage('Approve');
+
+    expect(component.selectedAgents.map((agent) => agent.name)).toEqual(['Action Plan Reviewer Agent']);
+    expect(fixture.nativeElement.textContent).toContain('Manager or Admin');
+    expect(fixture.nativeElement.textContent).toContain('Awaiting decision');
+  });
+
+  it('does not render the removed explanatory copy or generic diagnostic reason', () => {
+    const incident = incidentFixture();
+    incident.explanation.agents = configuredAgents();
+    incident.explanation.trace!.toolCalls[0].reason = 'Default bounded diagnostic operation from the v1 catalog.';
+    recreateWithIncident(incident);
+    clickStage('Diagnose');
+
+    const text = fixture.nativeElement.textContent;
+    expect(text).not.toContain('Click a stage to see who was responsible and what that stage means.');
+    expect(text).not.toContain('Configured collaboration');
+    expect(text).not.toContain('Agent handoff chain');
+    expect(text).not.toContain('Coordinate the bounded incident workflow and preserve handoff order.');
+    expect(text).not.toContain('Classify the incident and produce an operator-readable triage summary.');
+    expect(text).not.toContain('Collect bounded diagnostic evidence from approved operation IDs.');
+    expect(text).not.toContain('Propose a structured remediation plan from triage and bounded evidence.');
+    expect(text).not.toContain('Validate the proposed plan before it can be stored or approved.');
+    expect(text).not.toContain('Execute approved remediation and fixed verification after human approval.');
+    expect(text).not.toContain('Tools receive reviewed operation IDs and server-bound run context.');
+    expect(text).not.toContain('Default bounded diagnostic operation from the v1 catalog.');
+    expect(text).not.toContain('Output is redacted and capped before storage.');
   });
 
   it('keeps the current workflow step visible as active state advances', () => {
