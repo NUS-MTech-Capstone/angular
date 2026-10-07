@@ -2,12 +2,14 @@ import {
   AfterViewInit,
   ChangeDetectorRef,
   Component,
+  CSP_NONCE,
   ElementRef,
+  inject,
   OnDestroy,
   signal,
   ViewChild,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule, DOCUMENT } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { Title } from '@angular/platform-browser';
@@ -23,6 +25,7 @@ import { NzTooltipModule } from 'ng-zorro-antd/tooltip';
 import { ITheme, Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { API_VERSION, gatewayPath } from '../../core/api.constants';
+import { withStyleNonce } from '../../core/style-nonce-document';
 
 /** Binary terminal protocol — must match proxy-dataplane/internal/protocol/packet.go */
 const enum PktType {
@@ -194,6 +197,9 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
     private http: HttpClient,
   ) {}
 
+  private readonly cspNonce = inject(CSP_NONCE);
+  private readonly browserDocument = inject(DOCUMENT);
+
   ngAfterViewInit(): void {
     const params = this.route.snapshot.queryParamMap;
     this.osUser = params.get('user') || this.osUser;
@@ -209,6 +215,7 @@ export class TerminalPage implements AfterViewInit, OnDestroy {
     this.loadSettings();
 
     this.term = new Terminal({
+      documentOverride: withStyleNonce(this.browserDocument, this.cspNonce),
       fontFamily: this.settings.fontFamily,
       fontSize: this.settings.fontSize,
       cursorStyle: this.settings.cursorStyle,

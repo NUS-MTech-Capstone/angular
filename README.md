@@ -126,6 +126,16 @@ immutable caching headers, while SPA HTML and probe responses use
 Nginx applies the enforced application CSP, clickjacking and MIME-sniffing
 protection, a restricted permissions policy, the referrer policy, and
 `Strict-Transport-Security: max-age=31536000`. The CSP intentionally retains
-the sources required by the current Angular and WebSocket UI; COEP and COOP are
-not enabled because the application does not require cross-origin isolation.
+the sources required by the current Angular and WebSocket UI. Connections are
+limited to the same origin and `wss://api.ddm.keiyam.me`; change this explicit
+WebSocket origin when deploying to another hostname. Styles use a fresh Nginx
+`$request_id` nonce, substituted into `ngCspNonce` on the Angular root element
+and included in the response CSP. HTML stays `no-store`, critical CSS inlining
+stays disabled, and hashed assets retain immutable caching. Angular and
+NG-ZORRO consume the application nonce. A scoped xterm `documentOverride`
+adds it to terminal-generated style elements without patching the global DOM.
+No `unsafe-inline` style allowance is required. COEP and COOP are not enabled
+because the application does not require cross-origin isolation.
 Nginx version tokens are disabled.
+
+The scoped xterm document adapter also nonces styles inserted into xterm-owned divs. This covers the xterm 6.0.0 scrollbar path, which bypasses its document override. Native DOM prototypes and other application elements remain unchanged.
