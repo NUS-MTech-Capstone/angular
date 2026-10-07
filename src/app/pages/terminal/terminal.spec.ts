@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { CSP_NONCE } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import {
   HttpTestingController,
@@ -59,7 +60,8 @@ vi.mock('@xterm/xterm', () => ({
     clearSelection = vi.fn();
     options = {};
 
-    constructor() {
+    constructor(options: Record<string, unknown>) {
+      this.options = options;
       lastTerm = this;
     }
   },
@@ -126,6 +128,7 @@ describe('TerminalPage', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         provideNzIcons(icons),
+        { provide: CSP_NONCE, useValue: 'terminal-test-nonce' },
         {
           provide: ActivatedRoute,
           useValue: {
@@ -169,6 +172,12 @@ describe('TerminalPage', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('gives xterm a document that nonces its generated style elements', () => {
+    const scoped = lastTerm.options['documentOverride'] as Document;
+    expect(scoped.createElement('style').nonce).toBe('terminal-test-nonce');
+    expect(document.createElement('style').nonce).toBe('');
   });
 
   it('should read connection params from query string', () => {
