@@ -73,3 +73,17 @@
   white-space: nowrap;
   cursor: help;
 }
+
+.header-actions {
+  justify-content: space-between;
+  text-align: right;
+  margin-bottom: 16px;
+}
+
+.clone-notice {
+  margin-bottom: 16px;
+}
+
+.full-width-control {
+  width: 100%;
+}

@@ -133,3 +133,24 @@
   color: rgba(0, 0, 0, 0.65);
   font-size: 12px;
 }
+
+.tag-filter-select {
+  min-width: 220px;
+}
+
+.tag-editor-select {
+  width: 200px;
+}
+
+.full-width-control {
+  width: 100%;
+}
+
+.muted-tag-note {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.sync-json-input {
+  font-family: monospace;
+  font-size: 12px;
+}
