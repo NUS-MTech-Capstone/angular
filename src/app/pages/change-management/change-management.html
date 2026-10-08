@@ -1,4 +1,4 @@
-  <div class="header-actions" style="justify-content: space-between; text-align: right; margin-bottom: 16px;">
+  <div class="header-actions">
     <button nz-button nzType="primary" *ngIf="can('change.create')" (click)="openCreateModal()">
       <i nz-icon nzType="plus"></i>
       New change request
@@ -89,7 +89,7 @@
         [nzMessage]="'Cloning from ' + cloningFromCrNumber"
         nzDescription="A new ticket ID will be generated. Adjust the fields as needed before submitting."
         nzShowIcon
-        style="margin-bottom: 16px;">
+        class="clone-notice">
       </nz-alert>
 
       <form nz-form [formGroup]="changeForm" (ngSubmit)="submitForm()">
@@ -130,7 +130,7 @@
               nzFormat="yyyy-MM-dd HH:mm"
               nzPlaceHolder="Select start date and time"
               [nzDisabledDate]="disabledDate"
-              style="width: 100%;">
+              class="full-width-control">
             </nz-date-picker>
             <ng-template #implementationStartError>
               <ng-container *ngIf="changeForm.get('implementationStartAt')?.hasError('required')">
@@ -155,7 +155,7 @@
               nzFormat="yyyy-MM-dd HH:mm"
               nzPlaceHolder="Select end date and time"
               [nzDisabledDate]="disabledDate"
-              style="width: 100%;">
+              class="full-width-control">
             </nz-date-picker>
             <ng-template #implementationEndError>
               <ng-container *ngIf="changeForm.get('implementationEndAt')?.hasError('required')">

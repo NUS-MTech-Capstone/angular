@@ -139,3 +139,5 @@ because the application does not require cross-origin isolation.
 Nginx version tokens are disabled.
 
 The scoped xterm document adapter also nonces styles inserted into xterm-owned divs. This covers the xterm 6.0.0 scrollbar path, which bypasses its document override. Native DOM prototypes and other application elements remain unchanged.
+
+Keep static presentation styles in component stylesheets rather than HTML `style` attributes: CSP nonces authorize style elements, not style attributes. Check change-management and inventory dialogs under the production CSP when changing their templates.
