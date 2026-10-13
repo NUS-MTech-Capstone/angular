@@ -7,7 +7,7 @@ on:
 
 jobs:
   ci:
-    uses: NUS-MTech-Capstone/github-actions-shared/.github/workflows/node-ci.yaml@main
+    uses: NUS-MTech-Capstone/github-actions-shared/.github/workflows/node-ci.yaml@0a2ab816ffd50e835f0d3553343f544f59f4b41b
     with:
       node-version: "22"
       test-command: npm test -- --watch=false --coverage --coverage-reporters=lcov
