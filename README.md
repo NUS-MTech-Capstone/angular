@@ -3,7 +3,7 @@
 Angular web client for the DenDenMushi change-request, inventory, access, user
 administration, and terminal workflows.
 
-In the Phase 1 baseline, Angular uses the authenticated ALB session, same-origin
+Angular uses the authenticated ALB session, same-origin
 webapp APIs, and direct Proxy Control Plane/Proxy Dataplane routes. It does not
 store production bearer tokens and does not proxy terminal traffic through the
 Nest Backend.
@@ -57,10 +57,8 @@ default operator view and Alerts provide supporting monitoring context:
 /agentic-ai/alerts/:alertId         concise alert context
 ```
 
-Legacy `/agentic-ai?incidentId=...` links redirect to the dedicated incident
-route. The previous incident and alert drawers have been removed so details are
-deep-linkable and the current outcome, workflow step, and required human action
-remain visible at presentation resolution.
+Incident and alert details have dedicated, deep-linkable routes. Legacy
+`/agentic-ai?incidentId=...` links redirect to the incident workspace.
 
 Incident detail presents Overview, Agent activity, Evidence and safety, and
 Timeline and audit sections. The activity view distinguishes deterministic,
@@ -134,11 +132,8 @@ and included in the response CSP. HTML stays `no-store`, critical CSS inlining
 stays disabled, and hashed assets retain immutable caching. Angular and
 NG-ZORRO consume the application nonce. A scoped xterm `documentOverride`
 adds it to terminal-generated style elements without patching the global DOM.
-No `unsafe-inline` style allowance is required. COEP and COOP are not enabled
-because the application does not require cross-origin isolation.
+Terminal-generated styles, including scrollbar styles, receive the same nonce.
 Nginx version tokens are disabled.
-
-The scoped xterm document adapter also nonces styles inserted into xterm-owned divs. This covers the xterm 6.0.0 scrollbar path, which bypasses its document override. Native DOM prototypes and other application elements remain unchanged.
 
 Keep static presentation styles in component stylesheets rather than HTML `style` attributes: CSP nonces authorize style elements, not style attributes. Check change-management and inventory dialogs under the production CSP when changing their templates.
 

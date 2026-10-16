@@ -11,18 +11,19 @@ recovery path.
 
 ## Prerequisites
 
+Start each prerequisite in a separate terminal from the `angular` repository.
+
 1. **Google Chrome** installed locally
 2. **nest-backend** running with dev auth:
 
    ```bash
-   cd nest-backend
+   cd ../nest-backend
    AUTH_MODE=dev npm run start:dev
    ```
 
 3. **Angular dev server** running:
 
    ```bash
-   cd angular
    npm start
    ```
 
@@ -40,7 +41,7 @@ Headless mode (CI-friendly):
 npm run test:e2e:headless
 ```
 
-Run the live production workflow only from the verified capstone account:
+The opt-in AWS dev workflow uses the verified capstone account:
 
 ```bash
 AWS_PROFILE=capstone EXPECTED_AWS_ACCOUNT_ID=891377133321 \
@@ -54,7 +55,7 @@ captures only post-authentication screenshots under the ignored
 `e2e/artifacts/` directory, and closes the SSH session. If the test stops after
 the selected demo application is made unhealthy, the runner invokes the
 bounded `ddm-ops recover_demo_app` helper through SSM and waits for the alarm
-to recover. This is an application-health test, not a CPU-spike test.
+to recover. The workflow exercises application-health recovery.
 
 ## Configuration
 
